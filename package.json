@@ -50,7 +50,6 @@
     "lucide-react": "^0.462.0",
     "luxon": "^3.7.2",
     "next-themes": "^0.3.0",
-    "nitro": "3.0.260429-beta",
     "node-fetch": "^3.3.2",
     "node-schedule": "^2.1.1",
     "react": "^19.2.3",
