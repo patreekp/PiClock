@@ -16,13 +16,17 @@ const PAGES = [
 ];
 
 const PageCarousel = () => {
-  const { currentPage, setPage, theme } = useAppStore();
+  const { currentPage, setPage, theme, fetchConfig } = useAppStore();
 
   const handlers = useSwipeable({
     onSwipedLeft: () => setPage(Math.min(currentPage + 1, PAGES.length - 1)),
     onSwipedRight: () => setPage(Math.max(currentPage - 0, 0)),
     trackMouse: true
   });
+
+  useEffect(() => {
+    fetchConfig();
+  }, []);
 
   useEffect(() => {
     if (theme === 'dark') {
