@@ -1,9 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAlarmStore } from './useAlarmStore';
-import { Switch } from "@/components/ui/switch";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Plus, Bell, Trash2, X } from 'lucide-react';
+import { Plus, Bell, Trash2, X, Check } from 'lucide-react';
+import { ThemedSwitch, ThemedButton } from '@/components/ui-themed';
 
 const AlarmsPage = () => {
   const { alarms, fetchAlarms, addAlarm, toggleAlarm, deleteAlarm } = useAlarmStore();
@@ -11,62 +9,36 @@ const AlarmsPage = () => {
   const [newTime, setNewTime] = useState('07:00');
   const [newLabel, setNewLabel] = useState('');
 
-  useEffect(() => {
-    fetchAlarms();
-  }, []);
+  useEffect(() => { fetchAlarms(); }, []);
 
   const handleAdd = () => {
+    if (!newTime) return;
     addAlarm(newTime, newLabel);
     setIsAdding(false);
     setNewLabel('');
+    setNewTime('07:00');
+  };
+
+  const handleCancel = () => {
+    setIsAdding(false);
+    setNewLabel('');
+    setNewTime('07:00');
   };
 
   return (
-    <div className="h-full p-8 flex flex-col select-none">
-      <div className="flex justify-between items-center mb-8">
+    <div className="h-full flex flex-col select-none overflow-hidden">
+      <div className="flex justify-between items-center px-8 pt-8 pb-6 flex-shrink-0">
         <h2 className="text-4xl font-bold uppercase tracking-tighter">Sveglie</h2>
         {!isAdding && (
-          <Button 
-            variant="outline" 
-            onClick={() => setIsAdding(true)}
-            className="border-current rounded-none h-12 px-6 hover:bg-current hover:text-background transition-colors uppercase tracking-widest text-xs font-bold"
-          >
-            <Plus size={18} className="mr-2" /> Nuova
-          </Button>
+          <ThemedButton onClick={() => setIsAdding(true)} className="h-12 px-6 text-xs">
+            <Plus size={18} /> Nuova
+          </ThemedButton>
         )}
       </div>
 
-      {isAdding && (
-        <div className="mb-8 p-6 border border-current space-y-6 animate-in fade-in slide-in-from-top-4 duration-300">
-          <div className="flex justify-between items-center">
-            <span className="text-xs uppercase font-bold tracking-widest">Nuova Sveglia</span>
-            <Button variant="ghost" size="icon" onClick={() => setIsAdding(false)} className="h-8 w-8">
-              <X size={20} />
-            </Button>
-          </div>
-          <div className="flex gap-4">
-            <Input 
-              type="time" 
-              value={newTime} 
-              onChange={(e) => setNewTime(e.target.value)}
-              className="text-4xl font-mono-clock h-20 bg-transparent border-current rounded-none text-center"
-            />
-            <Input 
-              placeholder="Etichetta (es. Lavoro)" 
-              value={newLabel}
-              onChange={(e) => setNewLabel(e.target.value)}
-              className="flex-1 h-20 bg-transparent border-current rounded-none text-xl placeholder:opacity-30"
-            />
-          </div>
-          <Button onClick={handleAdd} className="w-full h-14 bg-current text-background rounded-none text-lg uppercase font-bold tracking-widest">
-            Salva Sveglia
-          </Button>
-        </div>
-      )}
-
-      <div className="space-y-6 overflow-y-auto flex-1 pr-2 custom-scrollbar">
+      <div className="flex-1 overflow-y-auto px-8 space-y-6 min-h-0">
         {alarms.length === 0 && !isAdding && (
-          <div className="h-full flex flex-col items-center justify-center opacity-20 mt-[-40px]">
+          <div className="h-full flex items-center justify-center opacity-20">
             <p className="text-2xl uppercase tracking-widest italic">Nessuna sveglia</p>
           </div>
         )}
@@ -77,26 +49,61 @@ const AlarmsPage = () => {
               <div className="text-sm uppercase opacity-60 mt-2 tracking-widest font-medium">{alarm.label || 'Sveglia'}</div>
             </div>
             <div className="flex items-center gap-8">
-              <Button 
-                variant="ghost" 
-                size="icon" 
+              <button
                 onClick={() => deleteAlarm(alarm.id)}
-                className="opacity-0 group-hover:opacity-40 hover:opacity-100 transition-opacity"
+                className="opacity-0 group-hover:opacity-40 hover:!opacity-100 transition-opacity p-2"
               >
                 <Trash2 size={24} />
-              </Button>
+              </button>
               <div className="flex items-center gap-4">
                 <Bell size={28} className={alarm.enabled ? 'opacity-100' : 'opacity-10'} />
-                <Switch 
-                  checked={!!alarm.enabled} 
+                <ThemedSwitch
+                  checked={!!alarm.enabled}
                   onCheckedChange={() => toggleAlarm(alarm)}
-                  className="data-[state=checked]:bg-current data-[state=unchecked]:bg-current/10 h-8 w-14"
                 />
               </div>
             </div>
           </div>
         ))}
       </div>
+
+      {isAdding && (
+        <div className="flex-shrink-0" style={{ borderTop: '1px solid var(--color-fg)', backgroundColor: 'var(--color-bg)' }}>
+          <div className="flex justify-between items-center px-8 pt-5 pb-3">
+            <span className="text-xs uppercase font-bold tracking-widest opacity-60">Nuova Sveglia</span>
+            <button onClick={handleCancel} className="opacity-40 hover:opacity-100 transition-opacity p-1">
+              <X size={20} />
+            </button>
+          </div>
+          <div className="px-8 mb-3">
+            <input
+              type="time"
+              value={newTime}
+              onChange={(e) => setNewTime(e.target.value)}
+              className="font-mono-clock font-bold text-4xl h-16 bg-transparent px-4 tracking-tighter focus:outline-none w-full text-center"
+              style={{ border: '2px solid var(--color-fg)' }}
+            />
+          </div>
+          <div className="flex" style={{ borderTop: '1px solid var(--color-fg)' }}>
+            <input
+              type="text"
+              placeholder="Etichetta (opzionale)"
+              value={newLabel}
+              onChange={(e) => setNewLabel(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && handleAdd()}
+              className="flex-1 h-16 bg-transparent px-6 text-lg placeholder:opacity-30 focus:outline-none"
+              style={{ borderRight: '1px solid var(--color-fg)' }}
+            />
+            <button
+              onClick={handleAdd}
+              className="flex-shrink-0 h-16 px-8 flex items-center gap-3 transition-opacity hover:opacity-80 active:opacity-60 uppercase text-sm font-bold tracking-widest"
+              style={{ backgroundColor: 'var(--color-fg)', color: 'var(--color-bg)' }}
+            >
+              <Check size={22} /> Salva
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

@@ -1,24 +1,47 @@
 import React, { useState, useEffect } from 'react';
-import { format } from 'date-fns';
-import { it } from 'date-fns/locale';
 import { useAppStore } from '../../store/useAppStore';
 import { useAlarmStore } from '../alarms/useAlarmStore';
 import { Bell } from 'lucide-react';
 
 const ClockPage = () => {
   const [now, setNow] = useState(new Date());
-  const { config } = useAppStore();
+  const { config, notification, setNotification } = useAppStore();
   const { alarms, fetchAlarms } = useAlarmStore();
 
   useEffect(() => {
     fetchAlarms();
-    const timer = setInterval(() => {
-      setNow(new Date());
-    }, 1000);
+    const timer = setInterval(() => setNow(new Date()), 1000);
     return () => clearInterval(timer);
   }, []);
 
-  // Check if any alarm is active within the next hour
+  // SSE — canale generico eventi libreria
+  useEffect(() => {
+    const es = new EventSource('/api/audio/events');
+
+    es.onmessage = (e) => {
+      try {
+        const msg = JSON.parse(e.data);
+
+        if (msg.type === 'library:scan-start') {
+          setNotification(`Analisi libreria... (0/${msg.total})`);
+        } else if (msg.type === 'library:scan-progress') {
+          setNotification(`Analisi libreria... (${msg.done}/${msg.total}) ${msg.filename}`);
+        } else if (msg.type === 'library:scan-done') {
+          const ok = msg.total - (msg.failed ?? 0);
+          setNotification(`Libreria pronta — ${ok} brani`, 5000);
+        } else if (msg.type === 'library:scan-error') {
+          setNotification(`Errore: ${msg.message}`, 8000);
+        }
+      } catch (_) {}
+    };
+
+    es.onerror = () => {
+      // Riconnessione automatica gestita dal browser — nessun log necessario
+    };
+
+    return () => es.close();
+  }, []);
+
   const nextAlarm = alarms
     .filter(a => !!a.enabled)
     .find(a => {
@@ -30,43 +53,57 @@ const ClockPage = () => {
       return diff > 0 && diff <= 60;
     });
 
-  // Format time based on config
-  const formattedTime = new Intl.DateTimeFormat('it-IT', {
-    hour: '2-digit',
-    minute: '2-digit',
+  const tz = config.timezone || 'Europe/Rome';
+  const timeParts = new Intl.DateTimeFormat('it-IT', {
+    hour: '2-digit', minute: '2-digit',
     second: config.showSeconds ? '2-digit' : undefined,
-    hour12: !config.clock24h,
-    timeZone: config.timezone || 'Europe/Rome'
-  }).format(now);
+    hour12: !config.clock24h, timeZone: tz,
+  }).formatToParts(now);
+
+  const get = (type: string) => timeParts.find(p => p.type === type)?.value ?? '';
+  const hours   = get('hour');
+  const minutes = get('minute');
+  const seconds = config.showSeconds ? get('second') : null;
+  const ampm    = !config.clock24h ? get('dayPeriod') : null;
 
   const formattedDate = new Intl.DateTimeFormat('it-IT', {
-    weekday: 'long',
-    day: 'numeric',
-    month: 'long',
-    year: 'numeric',
-    timeZone: config.timezone || 'Europe/Rome'
+    weekday: 'long', day: 'numeric', month: 'long', year: 'numeric', timeZone: tz,
   }).format(now);
 
+  const clockSize = config.showSeconds ? 'text-[17vw]' : 'text-[28vw]';
+
+  // Label in fondo: notification se presente, altrimenti default
+  const footerLabel = notification || 'PiClock Active';
+  const isNotifying = !!notification;
+
   return (
-    <div className="h-full flex flex-col items-center justify-center p-6 select-none">
-      <div className="text-[32vw] font-mono-clock leading-none tracking-tighter font-bold tabular-nums">
-        {formattedTime}
+    <div className="h-full flex flex-col justify-center p-6 pt-8 select-none overflow-hidden">
+      <div className="flex items-start gap-0">
+        <div className={`font-mono-clock font-bold tabular-nums leading-[0.9] tracking-tighter ${clockSize} transition-all duration-300`}>
+          {hours}:{minutes}{seconds ? `:${seconds}` : ''}
+        </div>
+        {ampm && (
+          <div className="font-mono-clock font-bold leading-[0.9] tracking-tighter text-[8vw] ml-4 mt-1 opacity-80">
+            {ampm.toUpperCase()}
+          </div>
+        )}
       </div>
-      <div className="mt-8 text-2xl uppercase tracking-[0.2em] opacity-60 font-medium">
+
+      <div className="mt-6 text-xl uppercase tracking-[0.2em] opacity-60 font-medium capitalize">
         {formattedDate}
       </div>
-      
+
       {nextAlarm && (
-        <div className="mt-12 flex items-center gap-3 px-6 py-3 border border-current animate-pulse">
+        <div className="mt-10 flex items-center gap-3 px-6 py-3 border border-current animate-pulse w-fit">
           <Bell size={20} />
           <span className="text-sm uppercase font-bold tracking-widest">Sveglia alle {nextAlarm.time}</span>
         </div>
       )}
-      
-      <div className="absolute bottom-12 opacity-20">
-        <div className="flex items-center gap-2 text-xs uppercase tracking-widest">
-          <div className="h-1 w-1 bg-current rounded-full" />
-          RaspiClock Active
+
+      <div className="absolute bottom-12 left-0 right-0 flex justify-center">
+        <div className={`flex items-center gap-2 text-xs uppercase tracking-widest transition-opacity duration-500 ${isNotifying ? 'opacity-80' : 'opacity-20'}`}>
+          <div className={`h-1 w-1 bg-current rounded-full ${isNotifying ? 'animate-pulse' : ''}`} />
+          <span className="max-w-[70vw] truncate">{footerLabel}</span>
         </div>
       </div>
     </div>
