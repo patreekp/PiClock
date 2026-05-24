@@ -1,6 +1,6 @@
-# PiClock
+# PiClock (WIP)
 
-A minimal, touch-friendly dashboard for **Raspberry Pi 3 Model B+** with a 4.3" 800×480 display — designed as a drop-in replacement for a Xiaomi Mi Smart Clock (x04g)
+A minimal, touch-friendly dashboard for **Raspberry Pi 3 Model B+** with a 4.3" 800×480 display - designed as a drop-in replacement for a Xiaomi Mi Smart Clock (x04g)
 
 Swipe between pages to access the clock, weather, to-do list, and alarms. No cloud account, no subscription, no tracking.
 
@@ -10,30 +10,31 @@ Swipe between pages to access the clock, weather, to-do list, and alarms. No clo
 
 ## What it does
 
-**Clock** — 12h/24h format, optional seconds, configurable timezone. Clean, full-screen display optimized for e-paper-style readability at a glance.
+**Clock**  12h/24h format, optional seconds, configurable timezone. Clean, full-screen display optimized for e-paper-style readability at a glance.
 
-**Weather** — Powered by [Open-Meteo](https://open-meteo.com/) (free, no API key required). 5-day forecast with caching to minimize network calls.
+**Weather**  Powered by [Open-Meteo](https://open-meteo.com/) (free, no API key required). 5-day forecast with caching to minimize network calls.
 
-**To-do list** — Simple, persistent task list backed by SQLite. Add, check off, and delete tasks with touch-friendly controls.
+**To-do list**  Simple, persistent task list backed by SQLite. Add, check off, and delete tasks with touch-friendly controls.
 
-**Alarms** — Scheduled with `node-schedule`, plays audio files in a loop from a local folder. Configurable snooze (1, 5, or 10 minutes). The alarm modal takes over the full screen when triggered.
+**Alarms**  Scheduled with `node-schedule`, plays audio files in a loop from a local folder. Configurable snooze (1, 5, or 10 minutes). The alarm modal takes over the full screen when triggered.
 
-**Song Highlights** — Uses `ffmpeg` (ebur128 loudness analysis) to detect the most intense moment of each audio file. Alarms start from that highlight instead of the beginning — so you wake up to the best part of the track.
+**Song Highlights**  Uses `ffmpeg` (ebur128 loudness analysis) to detect the most intense moment of each audio file. Alarms start from that highlight instead of the beginning  so you wake up to the best part of the track.
 
-**Auto theme** — Light/dark mode that follows actual sunrise and sunset times, calculated with the NOAA solar formula from your configured coordinates.
+**Auto theme**  Light/dark mode that follows actual sunrise and sunset times, calculated with the NOAA solar formula from your configured coordinates.
 
 ---
 
 ## Pages
 
-The interface is a horizontal swipe carousel — four pages, all navigable by touch or mouse drag.
+The interface is a horizontal swipe carousel  four pages, all navigable by touch or mouse drag.
 
-| Page | Content |
-|---|---|
-| Clock | Time, date, next alarm indicator, system notifications |
-| Weather | Current conditions + 5-day forecast |
-| To-do | Task list with add/complete/delete |
-| Alarms | Alarm management + settings |
+| Page | Content | Preview | 
+|---|---|---|
+| Clock | Time, date, next alarm indicator, system notifications | ![Screenshot](wiki/clockPageWhiteTheme.png) ![Screenshot](wiki/clockPageDarkTheme.png) | 
+| Weather | Current conditions + 5-day forecast | ![Screenshot](wiki/weatherPageLightTheme.png) | 
+| To-do | Task list with add/complete/delete | ![Screenshot](wiki/todoPageLightTheme.png) | 
+| Alarms | Alarm management | ![Screenshot](wiki/alarmsPageLightTheme.png) | 
+| Settings | Settings management | ![Screenshot](wiki/settingsPageLightTheme.png) |
 
 ---
 
@@ -62,16 +63,16 @@ npm install
 Then open two terminals:
 
 ```bash
-# Terminal 1 — backend
+# Terminal 1  backend
 npm run server
 
-# Terminal 2 — frontend
+# Terminal 2  frontend
 npm run dev
 ```
 
 Open `http://localhost:8080` in your browser.
 
-For full setup, Raspberry Pi deployment, and configuration details, see **[INSTALLATION.md](./INSTALLATION.md)**.
+For full setup, Raspberry Pi deployment, and configuration details, see **[INSTALLATION.md](wiki/Installation.md)**.
 
 ---
 
