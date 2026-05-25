@@ -1,12 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { useAppStore } from '../../store/useAppStore';
 import { useAlarmStore } from '../alarms/useAlarmStore';
+import { useTranslation } from '../../i18n/useTranslation';
 import { Bell } from 'lucide-react';
 
 const ClockPage = () => {
   const [now, setNow] = useState(new Date());
   const { config, notification, setNotification } = useAppStore();
   const { alarms, fetchAlarms } = useAlarmStore();
+  const { t, language } = useTranslation();
 
   useEffect(() => {
     fetchAlarms();
@@ -14,66 +16,49 @@ const ClockPage = () => {
     return () => clearInterval(timer);
   }, []);
 
-  // SSE — canale generico eventi libreria
   useEffect(() => {
     const es = new EventSource('/api/audio/events');
-
     es.onmessage = (e) => {
       try {
         const msg = JSON.parse(e.data);
-
-        if (msg.type === 'library:scan-start') {
-          setNotification(`Analisi libreria... (0/${msg.total})`);
-        } else if (msg.type === 'library:scan-progress') {
-          setNotification(`Analisi libreria... (${msg.done}/${msg.total}) ${msg.filename}`);
-        } else if (msg.type === 'library:scan-done') {
-          const ok = msg.total - (msg.failed ?? 0);
-          setNotification(`Libreria pronta — ${ok} brani`, 5000);
-        } else if (msg.type === 'library:scan-error') {
-          setNotification(`Errore: ${msg.message}`, 8000);
-        }
+        if (msg.type === 'library:scan-start')
+          setNotification(t('notify.scanStart', { total: msg.total }));
+        else if (msg.type === 'library:scan-progress')
+          setNotification(t('notify.scanProgress', { done: msg.done, total: msg.total, filename: msg.filename }));
+        else if (msg.type === 'library:scan-done')
+          setNotification(t('notify.scanDone', { count: msg.total - (msg.failed ?? 0) }), 5000);
+        else if (msg.type === 'library:scan-error')
+          setNotification(t('notify.scanError', { message: msg.message }), 8000);
       } catch (_) {}
     };
-
-    es.onerror = () => {
-      // Riconnessione automatica gestita dal browser — nessun log necessario
-    };
-
     return () => es.close();
-  }, []);
+  }, [language]);
 
-  const nextAlarm = alarms
-    .filter(a => !!a.enabled)
-    .find(a => {
-      const [h, m] = a.time.split(':').map(Number);
-      const alarmDate = new Date(now);
-      alarmDate.setHours(h, m, 0, 0);
-      if (alarmDate < now) alarmDate.setDate(alarmDate.getDate() + 1);
-      const diff = (alarmDate.getTime() - now.getTime()) / (1000 * 60);
-      return diff > 0 && diff <= 60;
-    });
+  const nextAlarm = alarms.filter(a => !!a.enabled).find(a => {
+    const [h, m] = a.time.split(':').map(Number);
+    const alarmDate = new Date(now);
+    alarmDate.setHours(h, m, 0, 0);
+    if (alarmDate < now) alarmDate.setDate(alarmDate.getDate() + 1);
+    const diff = (alarmDate.getTime() - now.getTime()) / (1000 * 60);
+    return diff > 0 && diff <= 60;
+  });
 
   const tz = config.timezone || 'Europe/Rome';
-  const timeParts = new Intl.DateTimeFormat('it-IT', {
+  const locale = language === 'it' ? 'it-IT' : 'en-GB';
+  const timeParts = new Intl.DateTimeFormat(locale, {
     hour: '2-digit', minute: '2-digit',
     second: config.showSeconds ? '2-digit' : undefined,
     hour12: !config.clock24h, timeZone: tz,
   }).formatToParts(now);
-
   const get = (type: string) => timeParts.find(p => p.type === type)?.value ?? '';
-  const hours   = get('hour');
-  const minutes = get('minute');
+  const hours = get('hour'); const minutes = get('minute');
   const seconds = config.showSeconds ? get('second') : null;
-  const ampm    = !config.clock24h ? get('dayPeriod') : null;
-
-  const formattedDate = new Intl.DateTimeFormat('it-IT', {
+  const ampm = !config.clock24h ? get('dayPeriod') : null;
+  const formattedDate = new Intl.DateTimeFormat(locale, {
     weekday: 'long', day: 'numeric', month: 'long', year: 'numeric', timeZone: tz,
   }).format(now);
-
   const clockSize = config.showSeconds ? 'text-[17vw]' : 'text-[28vw]';
-
-  // Label in fondo: notification se presente, altrimenti default
-  const footerLabel = notification || 'PiClock Active';
+  const footerLabel = notification || t('clock.appLabel');
   const isNotifying = !!notification;
 
   return (
@@ -82,24 +67,15 @@ const ClockPage = () => {
         <div className={`font-mono-clock font-bold tabular-nums leading-[0.9] tracking-tighter ${clockSize} transition-all duration-300`}>
           {hours}:{minutes}{seconds ? `:${seconds}` : ''}
         </div>
-        {ampm && (
-          <div className="font-mono-clock font-bold leading-[0.9] tracking-tighter text-[8vw] ml-4 mt-1 opacity-80">
-            {ampm.toUpperCase()}
-          </div>
-        )}
+        {ampm && <div className="font-mono-clock font-bold leading-[0.9] tracking-tighter text-[8vw] ml-4 mt-1 opacity-80">{ampm.toUpperCase()}</div>}
       </div>
-
-      <div className="mt-6 text-xl uppercase tracking-[0.2em] opacity-60 font-medium capitalize">
-        {formattedDate}
-      </div>
-
+      <div className="mt-6 text-xl uppercase tracking-[0.2em] opacity-60 font-medium capitalize">{formattedDate}</div>
       {nextAlarm && (
         <div className="mt-10 flex items-center gap-3 px-6 py-3 border border-current animate-pulse w-fit">
           <Bell size={20} />
-          <span className="text-sm uppercase font-bold tracking-widest">Sveglia alle {nextAlarm.time}</span>
+          <span className="text-sm uppercase font-bold tracking-widest">{t('clock.alarmIn')} {nextAlarm.time}</span>
         </div>
       )}
-
       <div className="absolute bottom-12 left-0 right-0 flex justify-center">
         <div className={`flex items-center gap-2 text-xs uppercase tracking-widest transition-opacity duration-500 ${isNotifying ? 'opacity-80' : 'opacity-20'}`}>
           <div className={`h-1 w-1 bg-current rounded-full ${isNotifying ? 'animate-pulse' : ''}`} />

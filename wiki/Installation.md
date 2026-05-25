@@ -170,7 +170,7 @@ Finally, run
 npm run build
 ```
 
-And frontend will be reachable from `http://localhost:8080`
+And frontend will be reachable from `http://localhost:3000`
 
 Static files are output to `dist/`. The Express backend can serve them directly, or you can use nginx as a reverse proxy.
 

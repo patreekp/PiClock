@@ -1,9 +1,11 @@
 import React, { useEffect } from 'react';
 import { useWeatherStore } from './useWeatherStore';
+import { useTranslation } from '../../i18n/useTranslation';
 import { Wind, Droplets, ArrowDown, ArrowUp } from 'lucide-react';
 
 const WeatherPage = () => {
   const { weather, loading, fetchWeather } = useWeatherStore();
+  const { t, language } = useTranslation();
 
   useEffect(() => {
     fetchWeather();
@@ -13,35 +15,36 @@ const WeatherPage = () => {
 
   if (loading && !weather) return (
     <div className="h-full flex items-center justify-center uppercase tracking-widest opacity-40" style={{ fontSize: '2.5vw' }}>
-      Caricamento...
+      {t('weather.loading')}
     </div>
   );
   if (!weather || !weather.current) return (
     <div className="h-full flex items-center justify-center uppercase tracking-widest opacity-40" style={{ fontSize: '2.5vw' }}>
-      Meteo non disponibile
+      {t('weather.error')}
     </div>
   );
 
   const { current, forecast } = weather;
+  const locale = language === 'it' ? 'it-IT' : 'en-GB';
 
   return (
     <div className="h-full flex flex-col select-none overflow-hidden" style={{ padding: '2vh 3vw' }}>
 
-      {/* ── Current weather — flex-1 so it takes exactly half the space ── */}
+      {/* ── Current weather ── */}
       <div className="flex items-stretch justify-between" style={{ flex: '1 1 0', minHeight: 0 }}>
 
         {/* Left: location + stats + condition */}
         <div className="flex flex-col justify-between py-[1vh]">
           <div>
             <h2 className="font-bold uppercase tracking-tighter leading-none" style={{ fontSize: '4.5vw' }}>Rimini</h2>
-            <p className="uppercase tracking-[0.2em] opacity-50" style={{ fontSize: '1.3vw', marginTop: '0.4vh' }}>Italia</p>
+            <p className="uppercase tracking-[0.2em] opacity-50" style={{ fontSize: '1.3vw', marginTop: '0.4vh' }}>{t('weather.country')}</p>
           </div>
 
           <div className="flex gap-[2vw]" style={{ marginTop: '1vh' }}>
             <div className="flex items-center gap-[0.5vw]">
               <Droplets style={{ width: '1.8vw', height: '1.8vw' }} className="opacity-50" />
               <span className="font-bold" style={{ fontSize: '1.8vw' }}>{current.humidity}%</span>
-              <span className="opacity-50 uppercase tracking-widest" style={{ fontSize: '1.1vw' }}>umid.</span>
+              <span className="opacity-50 uppercase tracking-widest" style={{ fontSize: '1.1vw' }}>{t('weather.humidity')}</span>
             </div>
             <div className="flex items-center gap-[0.5vw]">
               <Wind style={{ width: '1.8vw', height: '1.8vw' }} className="opacity-50" />
@@ -64,7 +67,7 @@ const WeatherPage = () => {
             <span style={{ fontSize: '6vw', lineHeight: 1, marginTop: '0.5vw' }}>{current.symbol}</span>
           </div>
           <p className="opacity-50 uppercase tracking-widest" style={{ fontSize: '1.3vw' }}>
-            Percepiti {current.feelsLike}°
+            {t('weather.feelsLike')} {current.feelsLike}°
           </p>
         </div>
       </div>
@@ -72,7 +75,7 @@ const WeatherPage = () => {
       {/* ── Divider ── */}
       <div style={{ borderTop: '1px solid rgba(128,128,128,0.2)', margin: '0' }} />
 
-      {/* ── 5-day forecast — flex-1 fills remaining space ── */}
+      {/* ── 5-day forecast ── */}
       <div className="flex items-stretch" style={{ flex: '1 1 0', minHeight: 0, gap: '1vw', paddingTop: '2vh', paddingBottom: '1vh' }}>
         {(forecast ?? []).map((day: { date: string; symbol: string; max: number; min: number }) => (
           <div
@@ -81,7 +84,7 @@ const WeatherPage = () => {
             style={{ flex: 1, padding: '1.2vh 0.5vw' }}
           >
             <span className="uppercase font-bold opacity-50 tracking-widest" style={{ fontSize: '1.3vw' }}>
-              {new Date(day.date).toLocaleDateString('it-IT', { weekday: 'short' })}
+              {new Date(day.date).toLocaleDateString(locale, { weekday: 'short' })}
             </span>
             <span style={{ fontSize: '5vw', lineHeight: 1 }}>{day.symbol}</span>
             <div>
