@@ -97,10 +97,10 @@ const IconBtn = ({ onClick, children, large, disabled }: {
     onClick={onClick}
     disabled={disabled}
     style={{
-      width: large ? '56px' : '42px',
-      height: large ? '56px' : '42px',
+      width: large ? '68px' : '50px',
+      height: large ? '68px' : '50px',
       borderRadius: '50%',
-      border: '1.5px solid var(--color-fg)',
+      border: '2px solid var(--color-fg)',
       background: large ? 'var(--color-fg)' : 'transparent',
       color: large ? 'var(--color-bg)' : 'var(--color-fg)',
       cursor: disabled ? 'default' : 'pointer',
@@ -118,13 +118,7 @@ const PomodoroPage = () => {
   const { config } = useAppStore();
   const { t } = useTranslation();
 
-  const {
-    pomodoroStyle,
-    pomodoroFocusMin,
-    pomodoroShortBreakMin,
-    pomodoroLongBreakMin,
-    pomodoroSessions,
-  } = config;
+  const { pomodoroStyle, pomodoroFocusMin, pomodoroShortBreakMin, pomodoroLongBreakMin, pomodoroSessions } = config;
 
   const getDuration = useCallback((p: Phase) => {
     if (p === 'focus') return pomodoroFocusMin * 60;
@@ -133,29 +127,21 @@ const PomodoroPage = () => {
   }, [pomodoroFocusMin, pomodoroShortBreakMin, pomodoroLongBreakMin]);
 
   const [timer, setTimer] = useState<TimerState>(() => ({
-    phase: 'focus',
-    sessionIndex: 0,
+    phase: 'focus', sessionIndex: 0,
     secondsLeft: pomodoroFocusMin * 60,
-    running: false,
-    cycleComplete: false,
+    running: false, cycleComplete: false,
   }));
 
   const timerRef = useRef<TimerState>(timer);
   useEffect(() => { timerRef.current = timer; }, [timer]);
-
   const getDurationRef = useRef(getDuration);
   useEffect(() => { getDurationRef.current = getDuration; }, [getDuration]);
-
   const sessionsRef = useRef(pomodoroSessions);
   useEffect(() => { sessionsRef.current = pomodoroSessions; }, [pomodoroSessions]);
-
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const stopInterval = useCallback(() => {
-    if (intervalRef.current !== null) {
-      clearInterval(intervalRef.current);
-      intervalRef.current = null;
-    }
+    if (intervalRef.current !== null) { clearInterval(intervalRef.current); intervalRef.current = null; }
   }, []);
 
   const computeNextState = useCallback((current: TimerState): TimerState => {
@@ -163,14 +149,11 @@ const PomodoroPage = () => {
     const getDur = getDurationRef.current;
     if (current.phase === 'focus') {
       const nextIdx = current.sessionIndex + 1;
-      if (nextIdx >= sessions) {
-        return { phase: 'focus', sessionIndex: 0, secondsLeft: getDur('focus'), running: false, cycleComplete: true };
-      }
+      if (nextIdx >= sessions) return { phase: 'focus', sessionIndex: 0, secondsLeft: getDur('focus'), running: false, cycleComplete: true };
       const nextPhase: Phase = nextIdx === sessions - 1 ? 'longBreak' : 'shortBreak';
       return { phase: nextPhase, sessionIndex: nextIdx, secondsLeft: getDur(nextPhase), running: false, cycleComplete: false };
-    } else {
-      return { phase: 'focus', sessionIndex: current.sessionIndex, secondsLeft: getDur('focus'), running: false, cycleComplete: false };
     }
+    return { phase: 'focus', sessionIndex: current.sessionIndex, secondsLeft: getDur('focus'), running: false, cycleComplete: false };
   }, []);
 
   useEffect(() => {
@@ -185,21 +168,16 @@ const PomodoroPage = () => {
   }, [timer.running, computeNextState, stopInterval]);
 
   useEffect(() => {
-    if (!timerRef.current.running && !timerRef.current.cycleComplete) {
+    if (!timerRef.current.running && !timerRef.current.cycleComplete)
       setTimer(prev => ({ ...prev, secondsLeft: getDuration(prev.phase) }));
-    }
   }, [pomodoroFocusMin, pomodoroShortBreakMin, pomodoroLongBreakMin]);
 
   useEffect(() => stopInterval, [stopInterval]);
 
   const handlePlayPause = () => {
-    if (timer.cycleComplete) {
-      setTimer({ phase: 'focus', sessionIndex: 0, secondsLeft: getDuration('focus'), running: true, cycleComplete: false });
-      return;
-    }
+    if (timer.cycleComplete) { setTimer({ phase: 'focus', sessionIndex: 0, secondsLeft: getDuration('focus'), running: true, cycleComplete: false }); return; }
     setTimer(prev => ({ ...prev, running: !prev.running }));
   };
-
   const handleNext = () => { stopInterval(); setTimer(prev => computeNextState(prev)); };
   const handleReset = () => { stopInterval(); setTimer({ phase: 'focus', sessionIndex: 0, secondsLeft: getDuration('focus'), running: false, cycleComplete: false }); };
 
@@ -208,7 +186,6 @@ const PomodoroPage = () => {
   const progress = Math.max(0, Math.min(1, 1 - secondsLeft / totalSecs));
   const mm = String(Math.floor(secondsLeft / 60)).padStart(2, '0');
   const ss = String(secondsLeft % 60).padStart(2, '0');
-
   const phaseLabel = phase === 'focus' ? t('pomodoro.focus') : phase === 'shortBreak' ? t('pomodoro.shortBreak') : t('pomodoro.longBreak');
   const sessionLabel = `${sessionIndex + 1} ${t('pomodoro.of')} ${pomodoroSessions}`;
   const isResetDisabled = !running && secondsLeft === getDuration('focus') && sessionIndex === 0 && phase === 'focus' && !cycleComplete;
@@ -217,20 +194,20 @@ const PomodoroPage = () => {
     <div style={{
       height: '100%', width: '100%',
       display: 'flex', flexDirection: 'row', alignItems: 'stretch',
-      padding: '36px 48px', boxSizing: 'border-box',
+      padding: '32px 40px', boxSizing: 'border-box',
     }}>
 
       {/* ── Sinistra: titolo, tempo, pips, controlli ── */}
       <div style={{
         display: 'flex', flexDirection: 'column',
         justifyContent: 'space-between',
-        flex: '0 0 320px',
-        paddingRight: '48px',
+        width: '300px', flexShrink: 0,
+        paddingRight: '32px',
       }}>
         {/* Titolo + sessione */}
         <div>
           <h2 style={{
-            fontSize: '40px', fontWeight: 700, textTransform: 'uppercase',
+            fontSize: '44px', fontWeight: 700, textTransform: 'uppercase',
             letterSpacing: '-0.03em', lineHeight: 1, color: 'var(--color-fg)', margin: 0,
           }}>
             {cycleComplete ? t('pomodoro.done') : phaseLabel}
@@ -245,9 +222,9 @@ const PomodoroPage = () => {
         </div>
 
         {/* Tempo + pips */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
           <div style={{
-            fontSize: '64px', fontWeight: 200, letterSpacing: '0.03em',
+            fontSize: '72px', fontWeight: 200, letterSpacing: '0.02em',
             color: 'var(--color-fg)', fontVariantNumeric: 'tabular-nums', lineHeight: 1,
           }}>
             {mm}:{ss}
@@ -256,44 +233,42 @@ const PomodoroPage = () => {
         </div>
 
         {/* Controlli */}
-        <div style={{ display: 'flex', gap: '14px', alignItems: 'center' }}>
+        <div style={{ display: 'flex', gap: '16px', alignItems: 'center' }}>
           <IconBtn onClick={handleReset} disabled={isResetDisabled}>
-            <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-              <rect x="2" y="2" width="10" height="10" fill="currentColor" />
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+              <rect x="2" y="2" width="12" height="12" fill="currentColor" />
             </svg>
           </IconBtn>
           <IconBtn onClick={handlePlayPause} large>
             {running ? (
-              <svg width="18" height="20" viewBox="0 0 18 20" fill="none">
-                <rect x="1" y="1" width="6" height="18" rx="1" fill="currentColor" />
-                <rect x="11" y="1" width="6" height="18" rx="1" fill="currentColor" />
+              <svg width="20" height="22" viewBox="0 0 20 22" fill="none">
+                <rect x="1" y="1" width="7" height="20" rx="1.5" fill="currentColor" />
+                <rect x="12" y="1" width="7" height="20" rx="1.5" fill="currentColor" />
               </svg>
             ) : (
-              <svg width="18" height="20" viewBox="0 0 18 20" fill="none">
-                <polygon points="2,1 17,10 2,19" fill="currentColor" />
+              <svg width="20" height="22" viewBox="0 0 20 22" fill="none">
+                <polygon points="2,1 19,11 2,21" fill="currentColor" />
               </svg>
             )}
           </IconBtn>
           <IconBtn onClick={handleNext} disabled={cycleComplete}>
-            <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-              <polygon points="1,2 11,8 1,14" fill="currentColor" />
-              <rect x="12" y="2" width="2.5" height="12" rx="1" fill="currentColor" />
+            <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
+              <polygon points="1,2 13,9 1,16" fill="currentColor" />
+              <rect x="14" y="2" width="3" height="14" rx="1" fill="currentColor" />
             </svg>
           </IconBtn>
         </div>
       </div>
 
-      {/* ── Destra: visual grande ── */}
+      {/* ── Destra: visual grande, centrato verticalmente ── */}
       <div style={{
         flex: 1,
         display: 'flex', alignItems: 'center', justifyContent: 'center',
         opacity: cycleComplete ? 0.2 : 1,
         transition: 'opacity 0.5s',
       }}>
-        <div style={{
-          width: '260px', height: '260px',
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-        }}>
+        {/* Dimensione fissa per stare nel 480px di altezza con i padding */}
+        <div style={{ width: '320px', height: '320px' }}>
           {pomodoroStyle === 'hourglass'
             ? <Hourglass progress={progress} />
             : <ArcPie progress={progress} />

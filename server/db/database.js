@@ -3,7 +3,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const DB_PATH = path.join(__dirname, '../../raspiclockdb.sqlite');
+const DB_PATH = path.join(__dirname, '../../piclockdb.sqlite');
 
 let db;
 export function getDb() { return db; }
