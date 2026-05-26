@@ -32,6 +32,12 @@ export function initDb() {
     alarmFolder: '/media/alarms', snoozeMinutes: '1',
     highlightMode: 'off', audjustApiKey: '',
     language: 'en',
+    // Pomodoro
+    pomodoroStyle: 'hourglass',   // 'hourglass' | 'arc'
+    pomodoroFocusMin: '25',
+    pomodoroShortBreakMin: '5',
+    pomodoroLongBreakMin: '15',
+    pomodoroSessions: '4',
   })) insert.run(key, value);
   console.log('Database initialized at', DB_PATH);
 }

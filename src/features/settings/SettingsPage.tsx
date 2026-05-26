@@ -1,15 +1,45 @@
 import React, { useState, useEffect } from 'react';
 import { useAppStore } from '../../store/useAppStore';
 import { useTranslation } from '../../i18n/useTranslation';
-import type { ThemeMode, HighlightMode, Language } from '../../store/useAppStore';
+import type { ThemeMode, HighlightMode, Language, PomodoroStyle } from '../../store/useAppStore';
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
-import { Moon, Sun, Clock, MapPin, Globe, Pencil, SunMoon, AlarmClock, Music, Loader2, RefreshCw, Languages } from 'lucide-react';
+import { Moon, Sun, Clock, MapPin, Globe, Pencil, SunMoon, AlarmClock, Music, Loader2, RefreshCw, Languages, Timer } from 'lucide-react';
 import { ThemedSwitch, ThemedToggleGroup, ThemedButton } from '@/components/ui-themed';
 import type { ToggleOption } from '@/components/ui-themed';
 
 interface LibraryStatus { total: number; scanned: number; pending: number; lastScan: string | null; scanInProgress: boolean; }
+
+// ── Minimal number stepper ────────────────────────────────────────────────────
+const Stepper = ({
+  value, min, max, step = 1, onChange, suffix,
+}: {
+  value: number; min: number; max: number; step?: number;
+  onChange: (v: number) => void; suffix?: string;
+}) => (
+  <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+    <button
+      onClick={() => onChange(Math.max(min, value - step))}
+      style={{
+        width: '36px', height: '36px', border: '1px solid var(--color-fg)', borderColor: 'color-mix(in srgb, var(--color-fg) 20%, transparent)',
+        background: 'transparent', color: 'var(--color-fg)', cursor: 'pointer', fontSize: '18px',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+      }}
+    >−</button>
+    <span style={{ minWidth: '48px', textAlign: 'center', fontSize: '20px', fontWeight: 700, color: 'var(--color-fg)' }}>
+      {value}{suffix ? <span style={{ fontSize: '11px', opacity: 0.5, marginLeft: '3px', fontWeight: 400 }}>{suffix}</span> : null}
+    </span>
+    <button
+      onClick={() => onChange(Math.min(max, value + step))}
+      style={{
+        width: '36px', height: '36px', border: '1px solid var(--color-fg)', borderColor: 'color-mix(in srgb, var(--color-fg) 20%, transparent)',
+        background: 'transparent', color: 'var(--color-fg)', cursor: 'pointer', fontSize: '18px',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+      }}
+    >+</button>
+  </div>
+);
 
 const SettingsPage = () => {
   const { theme, setTheme, config, updateConfig, setLanguage } = useAppStore();
@@ -37,6 +67,10 @@ const SettingsPage = () => {
   const LANGUAGE_OPTIONS: ToggleOption<Language>[] = [
     { value: 'en', label: 'EN' },
     { value: 'it', label: 'IT' },
+  ];
+  const POMODORO_STYLE_OPTIONS: ToggleOption<PomodoroStyle>[] = [
+    { value: 'hourglass', label: t('settings.pomodoroStyleHourglass') },
+    { value: 'arc',       label: t('settings.pomodoroStyleArc') },
   ];
 
   const fetchLibraryStatus = async () => {
@@ -82,6 +116,8 @@ const SettingsPage = () => {
     : theme === 'dark'
       ? t('settings.themeDesc.dark')
       : t('settings.themeDesc.light');
+
+  const minSuffix = t('settings.pomodoroMinSuffix');
 
   return (
     <div className="h-full p-8 flex flex-col overflow-y-auto select-none custom-scrollbar">
@@ -155,8 +191,8 @@ const SettingsPage = () => {
             </div>
             <ThemedButton onClick={openFolderDialog} className="h-12 px-5 text-xs flex-shrink-0"><Pencil size={15} /> {t('settings.audioFolderEdit')}</ThemedButton>
           </div>
-          <div className="mb-10">
-            <p className="text-xs uppercase opacity-50 font-bold tracking-widest mb-4">{t('settings.snooze')}</p>
+          <div className="flex items-center justify-between mb-10">
+            <p className="text-xs uppercase opacity-50 font-bold tracking-widest">{t('settings.snooze')}</p>
             <ThemedToggleGroup options={SNOOZE_OPTIONS} value={config.snoozeMinutes} onChange={(val) => updateConfig({ snoozeMinutes: val })} />
           </div>
         </div>
@@ -201,6 +237,67 @@ const SettingsPage = () => {
               </div>
             </div>
           )}
+        </div>
+
+        {/* ── Pomodoro ── */}
+        <div className="pt-10 border-t border-current/10">
+          <div className="flex items-center gap-4 mb-8">
+            <Timer size={28} />
+            <Label className="text-2xl font-bold uppercase tracking-tight">{t('settings.pomodoro')}</Label>
+          </div>
+
+          {/* Style toggle */}
+          <div className="flex items-center justify-between mb-8">
+            <div>
+              <p className="text-sm font-bold uppercase tracking-widest">{t('settings.pomodoroStyle')}</p>
+            </div>
+            <ThemedToggleGroup
+              options={POMODORO_STYLE_OPTIONS}
+              value={config.pomodoroStyle}
+              onChange={(val) => updateConfig({ pomodoroStyle: val })}
+            />
+          </div>
+
+          {/* Sessions per cycle */}
+          <div className="flex items-center justify-between mb-8">
+            <p className="text-sm font-bold uppercase tracking-widest">{t('settings.pomodoroSessions')}</p>
+            <Stepper
+              value={config.pomodoroSessions}
+              min={1} max={8}
+              onChange={(v) => updateConfig({ pomodoroSessions: v })}
+            />
+          </div>
+
+          {/* Durations grid */}
+          <div className="grid grid-cols-3 gap-6">
+            <div className="space-y-4">
+              <p className="text-xs uppercase opacity-50 font-bold tracking-widest">{t('settings.pomodoroFocusMin')}</p>
+              <Stepper
+                value={config.pomodoroFocusMin}
+                min={1} max={60} step={5}
+                onChange={(v) => updateConfig({ pomodoroFocusMin: v })}
+                suffix={minSuffix}
+              />
+            </div>
+            <div className="space-y-4">
+              <p className="text-xs uppercase opacity-50 font-bold tracking-widest">{t('settings.pomodoroShortBreakMin')}</p>
+              <Stepper
+                value={config.pomodoroShortBreakMin}
+                min={1} max={30} step={1}
+                onChange={(v) => updateConfig({ pomodoroShortBreakMin: v })}
+                suffix={minSuffix}
+              />
+            </div>
+            <div className="space-y-4">
+              <p className="text-xs uppercase opacity-50 font-bold tracking-widest">{t('settings.pomodoroLongBreakMin')}</p>
+              <Stepper
+                value={config.pomodoroLongBreakMin}
+                min={1} max={60} step={5}
+                onChange={(v) => updateConfig({ pomodoroLongBreakMin: v })}
+                suffix={minSuffix}
+              />
+            </div>
+          </div>
         </div>
 
       </div>

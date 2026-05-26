@@ -3,6 +3,7 @@ import { useSwipeable } from 'react-swipeable';
 import { useAppStore } from '../store/useAppStore';
 import ClockPage from '../features/clock/ClockPage';
 import WeatherPage from '../features/weather/WeatherPage';
+import PomodoroPage from '../features/pomodoro/PomodoroPage';
 import TodosPage from '../features/todos/TodosPage';
 import AlarmsPage from '../features/alarms/AlarmsPage';
 import SettingsPage from '../features/settings/SettingsPage';
@@ -10,13 +11,13 @@ import SettingsPage from '../features/settings/SettingsPage';
 const PAGES = [
   { label: 'Clock',    Component: ClockPage },
   { label: 'Weather',  Component: WeatherPage },
+  { label: 'Pomodoro', Component: PomodoroPage },
   { label: 'Todos',    Component: TodosPage },
   { label: 'Alarms',   Component: AlarmsPage },
   { label: 'Settings', Component: SettingsPage },
 ];
 
 // ── Sunrise/sunset formula (NOAA simplified) ─────────────────────────────────
-// Returns { sunrise, sunset } as Date objects for today, given lat/lon.
 function getSunTimes(lat: number, lon: number): { sunrise: Date; sunset: Date } {
   const now = new Date();
   const year = now.getFullYear();
@@ -27,10 +28,8 @@ function getSunTimes(lat: number, lon: number): { sunrise: Date; sunset: Date } 
   const toRad = (d: number) => (d * Math.PI) / 180;
   const toDeg = (r: number) => (r * 180) / Math.PI;
 
-  // Fractional year (radians)
   const gamma = (2 * Math.PI / 365) * (dayOfYear - 1 + (now.getHours() - 12) / 24);
 
-  // Equation of time (minutes)
   const eqtime =
     229.18 *
     (0.000075 +
@@ -39,7 +38,6 @@ function getSunTimes(lat: number, lon: number): { sunrise: Date; sunset: Date } 
       0.014615 * Math.cos(2 * gamma) -
       0.04089 * Math.sin(2 * gamma));
 
-  // Solar declination (radians)
   const decl =
     0.006918 -
     0.399912 * Math.cos(gamma) +
@@ -49,17 +47,14 @@ function getSunTimes(lat: number, lon: number): { sunrise: Date; sunset: Date } 
     0.002697 * Math.cos(3 * gamma) +
     0.00148 * Math.sin(3 * gamma);
 
-  // Hour angle at sunrise/sunset (degrees)
   const zenith = toRad(90.833);
   const latRad = toRad(lat);
   const cosHa =
     (Math.cos(zenith) - Math.sin(latRad) * Math.sin(decl)) /
     (Math.cos(latRad) * Math.cos(decl));
 
-  // Clamp to avoid NaN at extreme latitudes
   const haDeg = toDeg(Math.acos(Math.max(-1, Math.min(1, cosHa))));
 
-  // UTC sunrise/sunset in minutes from midnight
   const sunriseUTC = 720 - 4 * (lon + haDeg) - eqtime;
   const sunsetUTC  = 720 - 4 * (lon - haDeg) - eqtime;
 
@@ -92,7 +87,6 @@ const PageCarousel = () => {
 
   useEffect(() => { fetchConfig(); }, []);
 
-  // Apply the resolved dark/light class to <html>
   const applyTheme = useCallback(() => {
     if (theme === 'auto') {
       const lat = parseFloat(config.lat) || 44.0594;
@@ -104,10 +98,8 @@ const PageCarousel = () => {
     }
   }, [theme, config.lat, config.lon]);
 
-  // Re-apply whenever theme or coords change
   useEffect(() => { applyTheme(); }, [applyTheme]);
 
-  // In auto mode, re-check every minute (handles crossing sunrise/sunset live)
   useEffect(() => {
     if (theme !== 'auto') return;
     const interval = setInterval(applyTheme, 60 * 1000);

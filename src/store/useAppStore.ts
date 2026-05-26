@@ -3,6 +3,7 @@ import { create } from 'zustand';
 export type ThemeMode = 'light' | 'dark' | 'auto';
 export type HighlightMode = 'off' | 'local' | 'audjust';
 export type Language = 'en' | 'it';
+export type PomodoroStyle = 'hourglass' | 'arc';
 
 interface AppState {
   currentPage: number;
@@ -14,6 +15,12 @@ interface AppState {
     clock24h: boolean; showSeconds: boolean;
     alarmFolder: string; snoozeMinutes: number;
     highlightMode: HighlightMode;
+    // Pomodoro
+    pomodoroStyle: PomodoroStyle;
+    pomodoroFocusMin: number;
+    pomodoroShortBreakMin: number;
+    pomodoroLongBreakMin: number;
+    pomodoroSessions: number;
   };
   setPage: (page: number) => void;
   setNotification: (msg: string, autoClearMs?: number) => void;
@@ -25,7 +32,17 @@ interface AppState {
 
 export const useAppStore = create<AppState>((set, get) => ({
   currentPage: 0, theme: 'light', language: 'en', notification: '',
-  config: { lat: '44.0594', lon: '12.5683', timezone: 'Europe/Rome', clock24h: true, showSeconds: false, alarmFolder: '/media/alarms', snoozeMinutes: 1, highlightMode: 'off' },
+  config: {
+    lat: '44.0594', lon: '12.5683', timezone: 'Europe/Rome',
+    clock24h: true, showSeconds: false,
+    alarmFolder: '/media/alarms', snoozeMinutes: 1,
+    highlightMode: 'off',
+    pomodoroStyle: 'hourglass',
+    pomodoroFocusMin: 25,
+    pomodoroShortBreakMin: 5,
+    pomodoroLongBreakMin: 15,
+    pomodoroSessions: 4,
+  },
   setPage: (page) => set({ currentPage: page }),
   setNotification: (msg, autoClearMs) => {
     set({ notification: msg });
@@ -42,6 +59,11 @@ export const useAppStore = create<AppState>((set, get) => ({
           alarmFolder: data.alarmFolder ?? '/media/alarms',
           snoozeMinutes: parseInt(data.snoozeMinutes ?? '1', 10),
           highlightMode: (data.highlightMode as HighlightMode) ?? 'off',
+          pomodoroStyle: (data.pomodoroStyle as PomodoroStyle) ?? 'hourglass',
+          pomodoroFocusMin: parseInt(data.pomodoroFocusMin ?? '25', 10),
+          pomodoroShortBreakMin: parseInt(data.pomodoroShortBreakMin ?? '5', 10),
+          pomodoroLongBreakMin: parseInt(data.pomodoroLongBreakMin ?? '15', 10),
+          pomodoroSessions: parseInt(data.pomodoroSessions ?? '4', 10),
         },
         theme: (data.theme as ThemeMode) || 'light',
         language: (data.language as Language) || 'en',
