@@ -1,0 +1,235 @@
+export type Language = 'en' | 'it';
+
+const translations = {
+  en: {
+    // Clock
+    'clock.alarmIn': 'Alarm at',
+    'clock.appLabel': 'PiClock Active',
+
+    // Todos
+    'todos.title': 'To-do',
+    'todos.placeholder': 'Add a task...',
+    'todos.empty': 'Nothing to do',
+
+    // Alarms
+    'alarms.title': 'Alarms',
+    'alarms.new': 'New',
+    'alarms.empty': 'No alarms',
+    'alarms.defaultLabel': 'Alarm',
+    'alarms.newAlarm': 'New Alarm',
+    'alarms.labelPlaceholder': 'Label (optional)',
+    'alarms.save': 'Save',
+    'alarms.editAlarm': 'Edit Alarm',
+    'alarms.cancel': 'Cancel',
+    'alarms.delete': 'Delete',
+
+    // Alarm Modal
+    'alarmModal.snooze': 'Snooze',
+    'alarmModal.stop': 'Stop',
+
+    // Weather
+    'weather.loading': 'Loading...',
+    'weather.error': 'Weather unavailable',
+    'weather.country': 'Italy',
+    'weather.humidity': 'humid.',
+    'weather.feelsLike': 'Feels like',
+
+    // Settings
+    'settings.title': 'Settings',
+    'settings.theme': 'Theme',
+    'settings.themeLight': 'Light',
+    'settings.themeDark': 'Dark',
+    'settings.themeAuto': 'Auto',
+    'settings.themeDesc.auto': 'Follows sunrise and sunset',
+    'settings.themeDesc.dark': 'Night mode active',
+    'settings.themeDesc.light': 'Day mode active',
+    'settings.clock24h': '24h Format',
+    'settings.clock24hDesc': 'Use military time format',
+    'settings.showSeconds': 'Show Seconds',
+    'settings.showSecondsDesc': 'Updates every second',
+    'settings.location': 'Location & Weather',
+    'settings.lat': 'Latitude',
+    'settings.lon': 'Longitude',
+    'settings.timezone': 'Timezone',
+    'settings.audio': 'Audio & Alarms',
+    'settings.audioFolder': 'Audio Folder',
+    'settings.audioFolderEdit': 'Edit',
+    'settings.snooze': 'Snooze Duration',
+    'settings.snooze1': '1 min',
+    'settings.snooze5': '5 min',
+    'settings.snooze10': '10 min',
+    'settings.highlights': 'Song Highlights',
+    'settings.highlightsMode': 'Mode',
+    'settings.highlightsOff': 'Off',
+    'settings.highlightsOffDesc': 'Play from beginning',
+    'settings.highlightsLocal': 'Local',
+    'settings.highlightsLocalDesc': 'Local analysis with ffmpeg',
+    'settings.highlightsAudjust': 'Audjust',
+    'settings.highlightsAudjustDesc': 'Cloud analysis with Audjust',
+    'settings.libraryStatus': 'Library Status',
+    'settings.libraryLoading': 'Loading...',
+    'settings.libraryTracks': 'tracks analysed',
+    'settings.libraryPending': 'pending',
+    'settings.libraryLastScan': 'Last scan',
+    'settings.libraryNever': 'Never',
+    'settings.scanInProgress': 'In progress',
+    'settings.scanNew': 'Scan new',
+    'settings.scanAll': 'Rescan all',
+    'settings.scanning': 'Scanning...',
+    'settings.language': 'Language',
+    'settings.languageDesc': 'Interface language',
+
+    // Pomodoro settings
+    'settings.pomodoro': 'Pomodoro',
+    'settings.pomodoroStyle': 'Timer Style',
+    'settings.pomodoroStyleHourglass': 'Hourglass',
+    'settings.pomodoroStyleArc': 'Arc',
+    'settings.pomodoroSessions': 'Sessions per cycle',
+    'settings.pomodoroFocusMin': 'Focus',
+    'settings.pomodoroShortBreakMin': 'Short break',
+    'settings.pomodoroLongBreakMin': 'Long break',
+    'settings.pomodoroMinSuffix': 'min',
+
+    // Folder dialog
+    'dialog.audioFolder': 'Audio Folder',
+    'dialog.path': 'Path',
+    'dialog.pathPlaceholder': '/media/alarms',
+    'dialog.pathHint': 'Supported formats: .mp3 .ogg .wav',
+    'dialog.save': 'Save',
+    'dialog.cancel': 'Cancel',
+
+    // Footer
+    'footer.credit': 'PiClock — Designed for Raspberry Pi',
+
+    // SSE notifications
+    'notify.scanStart': 'Analysing library... (0/{total})',
+    'notify.scanProgress': 'Analysing library... ({done}/{total}) {filename}',
+    'notify.scanDone': 'Library ready — {count} tracks',
+    'notify.scanError': 'Error: {message}',
+
+    // Pomodoro page
+    'pomodoro.focus': 'Focus',
+    'pomodoro.shortBreak': 'Break',
+    'pomodoro.longBreak': 'Long break',
+    'pomodoro.session': 'Session',
+    'pomodoro.done': 'Cycle complete',
+    'pomodoro.of': 'of',
+  },
+  it: {
+    // Clock
+    'clock.alarmIn': 'Sveglia alle',
+    'clock.appLabel': 'PiClock Active',
+
+    // Todos
+    'todos.title': 'Cose da fare',
+    'todos.placeholder': 'Aggiungi un compito...',
+    'todos.empty': 'Nessun impegno',
+
+    // Alarms
+    'alarms.title': 'Sveglie',
+    'alarms.new': 'Nuova',
+    'alarms.empty': 'Nessuna sveglia',
+    'alarms.defaultLabel': 'Sveglia',
+    'alarms.newAlarm': 'Nuova Sveglia',
+    'alarms.labelPlaceholder': 'Etichetta (opzionale)',
+    'alarms.save': 'Salva',
+    'alarms.editAlarm': 'Modifica Sveglia',
+    'alarms.cancel': 'Annulla',
+    'alarms.delete': 'Elimina',
+
+    // Alarm Modal
+    'alarmModal.snooze': 'Snooze',
+    'alarmModal.stop': 'Stop',
+
+    // Weather
+    'weather.loading': 'Caricamento...',
+    'weather.error': 'Meteo non disponibile',
+    'weather.country': 'Italia',
+    'weather.humidity': 'umid.',
+    'weather.feelsLike': 'Percepiti',
+
+    // Settings
+    'settings.title': 'Impostazioni',
+    'settings.theme': 'Tema',
+    'settings.themeLight': 'Chiaro',
+    'settings.themeDark': 'Scuro',
+    'settings.themeAuto': 'Auto',
+    'settings.themeDesc.auto': 'Segue alba e tramonto',
+    'settings.themeDesc.dark': 'Modalità notte attiva',
+    'settings.themeDesc.light': 'Modalità giorno attiva',
+    'settings.clock24h': 'Formato 24h',
+    'settings.clock24hDesc': 'Usa il formato militare',
+    'settings.showSeconds': 'Mostra Secondi',
+    'settings.showSecondsDesc': 'Aggiornamento ogni secondo',
+    'settings.location': 'Posizione & Meteo',
+    'settings.lat': 'Latitudine',
+    'settings.lon': 'Longitudine',
+    'settings.timezone': 'Fuso Orario',
+    'settings.audio': 'Audio & Sveglie',
+    'settings.audioFolder': 'Cartella Audio',
+    'settings.audioFolderEdit': 'Modifica',
+    'settings.snooze': 'Durata Snooze',
+    'settings.snooze1': '1 min',
+    'settings.snooze5': '5 min',
+    'settings.snooze10': '10 min',
+    'settings.highlights': 'Song Highlights',
+    'settings.highlightsMode': 'Modalità',
+    'settings.highlightsOff': 'Off',
+    'settings.highlightsOffDesc': "Riproduzione dall'inizio",
+    'settings.highlightsLocal': 'Locale',
+    'settings.highlightsLocalDesc': 'Analisi locale con ffmpeg',
+    'settings.highlightsAudjust': 'Audjust',
+    'settings.highlightsAudjustDesc': 'Analisi cloud con Audjust',
+    'settings.libraryStatus': 'Stato Libreria',
+    'settings.libraryLoading': 'Caricamento...',
+    'settings.libraryTracks': 'brani analizzati',
+    'settings.libraryPending': 'in attesa',
+    'settings.libraryLastScan': 'Ultima scansione',
+    'settings.libraryNever': 'Mai',
+    'settings.scanInProgress': 'In corso',
+    'settings.scanNew': 'Scansiona nuovi',
+    'settings.scanAll': 'Riscansiona tutto',
+    'settings.scanning': 'Analisi in corso...',
+    'settings.language': 'Lingua',
+    'settings.languageDesc': "Lingua dell'interfaccia",
+
+    // Pomodoro settings
+    'settings.pomodoro': 'Pomodoro',
+    'settings.pomodoroStyle': 'Stile timer',
+    'settings.pomodoroStyleHourglass': 'Clessidra',
+    'settings.pomodoroStyleArc': 'Arco',
+    'settings.pomodoroSessions': 'Sessioni per ciclo',
+    'settings.pomodoroFocusMin': 'Focus',
+    'settings.pomodoroShortBreakMin': 'Pausa breve',
+    'settings.pomodoroLongBreakMin': 'Pausa lunga',
+    'settings.pomodoroMinSuffix': 'min',
+
+    // Folder dialog
+    'dialog.audioFolder': 'Cartella Audio',
+    'dialog.path': 'Percorso',
+    'dialog.pathPlaceholder': '/media/alarms',
+    'dialog.pathHint': 'File supportati: .mp3 .ogg .wav',
+    'dialog.save': 'Salva',
+    'dialog.cancel': 'Annulla',
+
+    // Footer
+    'footer.credit': 'PiClock — Progettato per Raspberry Pi',
+
+    // SSE notifications
+    'notify.scanStart': 'Analisi libreria... (0/{total})',
+    'notify.scanProgress': 'Analisi libreria... ({done}/{total}) {filename}',
+    'notify.scanDone': 'Libreria pronta — {count} brani',
+    'notify.scanError': 'Errore: {message}',
+
+    // Pomodoro page
+    'pomodoro.focus': 'Focus',
+    'pomodoro.shortBreak': 'Pausa',
+    'pomodoro.longBreak': 'Pausa lunga',
+    'pomodoro.session': 'Sessione',
+    'pomodoro.done': 'Ciclo completato',
+    'pomodoro.of': 'di',
+  },
+} as const;
+
+export type TranslationKey = keyof typeof translations.en;
+export default translations;

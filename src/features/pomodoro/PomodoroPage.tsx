@@ -1,0 +1,308 @@
+import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { useAppStore } from '../../store/useAppStore';
+import { useTranslation } from '../../i18n/useTranslation';
+
+type Phase = 'focus' | 'shortBreak' | 'longBreak';
+
+interface TimerState {
+  phase: Phase;
+  sessionIndex: number;
+  secondsLeft: number;
+  running: boolean;
+  cycleComplete: boolean;
+}
+
+// ── Hourglass SVG ─────────────────────────────────────────────────────────────
+const Hourglass = ({ progress }: { progress: number }) => {
+  const TOP_Y1 = 12, TOP_Y2 = 68;
+  const BOT_Y2 = 128;
+  const topHeight = TOP_Y2 - TOP_Y1;
+  const botHeight = BOT_Y2 - 74;
+
+  const topSandHeight = topHeight * (1 - progress);
+  const topSandY = TOP_Y1 + (topHeight - topSandHeight);
+  const botSandHeight = botHeight * progress;
+  const botSandY = BOT_Y2 - botSandHeight;
+  const showTrickle = progress < 0.99;
+
+  return (
+    <svg viewBox="0 0 140 142" width="100%" height="100%" style={{ overflow: 'visible' }} aria-hidden="true">
+      <defs>
+        <clipPath id="hg-top-sand-clip">
+          <rect x="0" y={topSandY} width="140" height={topSandHeight} />
+        </clipPath>
+        <clipPath id="hg-bot-sand-clip">
+          <rect x="0" y={botSandY} width="140" height={botSandHeight} />
+        </clipPath>
+      </defs>
+      <polygon points="10,12 130,12 70,68" fill="var(--color-bg)" stroke="var(--color-fg)" strokeWidth="1.5" strokeLinejoin="round" />
+      <polygon points="10,12 130,12 70,68" fill="var(--color-fg)" clipPath="url(#hg-top-sand-clip)" />
+      <rect x="66" y="67" width="8" height="8" fill="var(--color-fg)" opacity="0.3" />
+      <polygon points="10,128 130,128 70,72" fill="var(--color-bg)" stroke="var(--color-fg)" strokeWidth="1.5" strokeLinejoin="round" />
+      <polygon points="10,128 130,128 70,72" fill="var(--color-fg)" clipPath="url(#hg-bot-sand-clip)" />
+      <line x1="8" y1="12" x2="132" y2="12" stroke="var(--color-fg)" strokeWidth="3" strokeLinecap="round" />
+      <line x1="8" y1="128" x2="132" y2="128" stroke="var(--color-fg)" strokeWidth="3" strokeLinecap="round" />
+      {showTrickle && (
+        <line x1="70" y1="74" x2="70" y2="88" stroke="var(--color-fg)" strokeWidth="1.5" strokeLinecap="round" opacity="0.4" />
+      )}
+    </svg>
+  );
+};
+
+// ── Arc (pie) SVG ─────────────────────────────────────────────────────────────
+const ArcPie = ({ progress }: { progress: number }) => {
+  const cx = 70, cy = 70, r = 54;
+  const angle = (1 - progress) * 360;
+  const rad = ((angle - 90) * Math.PI) / 180;
+  const x = cx + r * Math.cos(rad);
+  const y = cy + r * Math.sin(rad);
+  const largeArc = angle > 180 ? 1 : 0;
+  const isFullCircle = progress <= 0.001;
+  const isEmptyCircle = progress >= 0.999;
+
+  return (
+    <svg viewBox="0 0 140 140" width="100%" height="100%" aria-hidden="true">
+      <circle cx={cx} cy={cy} r={r} fill="none" stroke="var(--color-fg)" strokeWidth="1.5" opacity="0.12" />
+      {!isEmptyCircle && (
+        isFullCircle
+          ? <circle cx={cx} cy={cy} r={r} fill="var(--color-fg)" />
+          : <path d={`M${cx},${cy} L${cx},${cy - r} A${r},${r} 0 ${largeArc},1 ${x.toFixed(2)},${y.toFixed(2)} Z`} fill="var(--color-fg)" />
+      )}
+      <circle cx={cx} cy={cy} r={36} fill="var(--color-bg)" />
+    </svg>
+  );
+};
+
+// ── Session pips ──────────────────────────────────────────────────────────────
+const SessionPips = ({ total, current }: { total: number; current: number }) => (
+  <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+    {Array.from({ length: total }).map((_, i) => (
+      <div key={i} style={{
+        width: i === current ? '24px' : '7px',
+        height: '3px',
+        borderRadius: '2px',
+        background: 'var(--color-fg)',
+        opacity: i < current ? 1 : i === current ? 1 : 0.18,
+        transition: 'all 0.3s ease',
+      }} />
+    ))}
+  </div>
+);
+
+// ── Icon button ───────────────────────────────────────────────────────────────
+const IconBtn = ({ onClick, children, large, disabled }: {
+  onClick: () => void; children: React.ReactNode; large?: boolean; disabled?: boolean;
+}) => (
+  <button
+    onClick={onClick}
+    disabled={disabled}
+    style={{
+      width: large ? '56px' : '42px',
+      height: large ? '56px' : '42px',
+      borderRadius: '50%',
+      border: '1.5px solid var(--color-fg)',
+      background: large ? 'var(--color-fg)' : 'transparent',
+      color: large ? 'var(--color-bg)' : 'var(--color-fg)',
+      cursor: disabled ? 'default' : 'pointer',
+      opacity: disabled ? 0.25 : 1,
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+      flexShrink: 0,
+      transition: 'opacity 0.2s',
+      WebkitTapHighlightColor: 'transparent',
+    }}
+  >{children}</button>
+);
+
+// ── Main component ────────────────────────────────────────────────────────────
+const PomodoroPage = () => {
+  const { config } = useAppStore();
+  const { t } = useTranslation();
+
+  const {
+    pomodoroStyle,
+    pomodoroFocusMin,
+    pomodoroShortBreakMin,
+    pomodoroLongBreakMin,
+    pomodoroSessions,
+  } = config;
+
+  const getDuration = useCallback((p: Phase) => {
+    if (p === 'focus') return pomodoroFocusMin * 60;
+    if (p === 'shortBreak') return pomodoroShortBreakMin * 60;
+    return pomodoroLongBreakMin * 60;
+  }, [pomodoroFocusMin, pomodoroShortBreakMin, pomodoroLongBreakMin]);
+
+  const [timer, setTimer] = useState<TimerState>(() => ({
+    phase: 'focus',
+    sessionIndex: 0,
+    secondsLeft: pomodoroFocusMin * 60,
+    running: false,
+    cycleComplete: false,
+  }));
+
+  const timerRef = useRef<TimerState>(timer);
+  useEffect(() => { timerRef.current = timer; }, [timer]);
+
+  const getDurationRef = useRef(getDuration);
+  useEffect(() => { getDurationRef.current = getDuration; }, [getDuration]);
+
+  const sessionsRef = useRef(pomodoroSessions);
+  useEffect(() => { sessionsRef.current = pomodoroSessions; }, [pomodoroSessions]);
+
+  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  const stopInterval = useCallback(() => {
+    if (intervalRef.current !== null) {
+      clearInterval(intervalRef.current);
+      intervalRef.current = null;
+    }
+  }, []);
+
+  const computeNextState = useCallback((current: TimerState): TimerState => {
+    const sessions = sessionsRef.current;
+    const getDur = getDurationRef.current;
+    if (current.phase === 'focus') {
+      const nextIdx = current.sessionIndex + 1;
+      if (nextIdx >= sessions) {
+        return { phase: 'focus', sessionIndex: 0, secondsLeft: getDur('focus'), running: false, cycleComplete: true };
+      }
+      const nextPhase: Phase = nextIdx === sessions - 1 ? 'longBreak' : 'shortBreak';
+      return { phase: nextPhase, sessionIndex: nextIdx, secondsLeft: getDur(nextPhase), running: false, cycleComplete: false };
+    } else {
+      return { phase: 'focus', sessionIndex: current.sessionIndex, secondsLeft: getDur('focus'), running: false, cycleComplete: false };
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!timer.running) { stopInterval(); return; }
+    stopInterval();
+    intervalRef.current = setInterval(() => {
+      const current = timerRef.current;
+      if (current.secondsLeft <= 1) { stopInterval(); setTimer(computeNextState(current)); return; }
+      setTimer(prev => ({ ...prev, secondsLeft: prev.secondsLeft - 1 }));
+    }, 1000);
+    return stopInterval;
+  }, [timer.running, computeNextState, stopInterval]);
+
+  useEffect(() => {
+    if (!timerRef.current.running && !timerRef.current.cycleComplete) {
+      setTimer(prev => ({ ...prev, secondsLeft: getDuration(prev.phase) }));
+    }
+  }, [pomodoroFocusMin, pomodoroShortBreakMin, pomodoroLongBreakMin]);
+
+  useEffect(() => stopInterval, [stopInterval]);
+
+  const handlePlayPause = () => {
+    if (timer.cycleComplete) {
+      setTimer({ phase: 'focus', sessionIndex: 0, secondsLeft: getDuration('focus'), running: true, cycleComplete: false });
+      return;
+    }
+    setTimer(prev => ({ ...prev, running: !prev.running }));
+  };
+
+  const handleNext = () => { stopInterval(); setTimer(prev => computeNextState(prev)); };
+  const handleReset = () => { stopInterval(); setTimer({ phase: 'focus', sessionIndex: 0, secondsLeft: getDuration('focus'), running: false, cycleComplete: false }); };
+
+  const { phase, sessionIndex, secondsLeft, running, cycleComplete } = timer;
+  const totalSecs = getDuration(phase) || 1;
+  const progress = Math.max(0, Math.min(1, 1 - secondsLeft / totalSecs));
+  const mm = String(Math.floor(secondsLeft / 60)).padStart(2, '0');
+  const ss = String(secondsLeft % 60).padStart(2, '0');
+
+  const phaseLabel = phase === 'focus' ? t('pomodoro.focus') : phase === 'shortBreak' ? t('pomodoro.shortBreak') : t('pomodoro.longBreak');
+  const sessionLabel = `${sessionIndex + 1} ${t('pomodoro.of')} ${pomodoroSessions}`;
+  const isResetDisabled = !running && secondsLeft === getDuration('focus') && sessionIndex === 0 && phase === 'focus' && !cycleComplete;
+
+  return (
+    <div style={{
+      height: '100%', width: '100%',
+      display: 'flex', flexDirection: 'row', alignItems: 'stretch',
+      padding: '36px 48px', boxSizing: 'border-box',
+    }}>
+
+      {/* ── Sinistra: titolo, tempo, pips, controlli ── */}
+      <div style={{
+        display: 'flex', flexDirection: 'column',
+        justifyContent: 'space-between',
+        flex: '0 0 320px',
+        paddingRight: '48px',
+      }}>
+        {/* Titolo + sessione */}
+        <div>
+          <h2 style={{
+            fontSize: '40px', fontWeight: 700, textTransform: 'uppercase',
+            letterSpacing: '-0.03em', lineHeight: 1, color: 'var(--color-fg)', margin: 0,
+          }}>
+            {cycleComplete ? t('pomodoro.done') : phaseLabel}
+          </h2>
+          <p style={{
+            fontSize: '11px', fontWeight: 700, letterSpacing: '0.12em',
+            textTransform: 'uppercase', color: 'var(--color-fg)',
+            opacity: 0.35, marginTop: '10px', marginBottom: 0,
+          }}>
+            {cycleComplete ? '\u00a0' : sessionLabel}
+          </p>
+        </div>
+
+        {/* Tempo + pips */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
+          <div style={{
+            fontSize: '64px', fontWeight: 200, letterSpacing: '0.03em',
+            color: 'var(--color-fg)', fontVariantNumeric: 'tabular-nums', lineHeight: 1,
+          }}>
+            {mm}:{ss}
+          </div>
+          {!cycleComplete && <SessionPips total={pomodoroSessions} current={sessionIndex} />}
+        </div>
+
+        {/* Controlli */}
+        <div style={{ display: 'flex', gap: '14px', alignItems: 'center' }}>
+          <IconBtn onClick={handleReset} disabled={isResetDisabled}>
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+              <rect x="2" y="2" width="10" height="10" fill="currentColor" />
+            </svg>
+          </IconBtn>
+          <IconBtn onClick={handlePlayPause} large>
+            {running ? (
+              <svg width="18" height="20" viewBox="0 0 18 20" fill="none">
+                <rect x="1" y="1" width="6" height="18" rx="1" fill="currentColor" />
+                <rect x="11" y="1" width="6" height="18" rx="1" fill="currentColor" />
+              </svg>
+            ) : (
+              <svg width="18" height="20" viewBox="0 0 18 20" fill="none">
+                <polygon points="2,1 17,10 2,19" fill="currentColor" />
+              </svg>
+            )}
+          </IconBtn>
+          <IconBtn onClick={handleNext} disabled={cycleComplete}>
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+              <polygon points="1,2 11,8 1,14" fill="currentColor" />
+              <rect x="12" y="2" width="2.5" height="12" rx="1" fill="currentColor" />
+            </svg>
+          </IconBtn>
+        </div>
+      </div>
+
+      {/* ── Destra: visual grande ── */}
+      <div style={{
+        flex: 1,
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        opacity: cycleComplete ? 0.2 : 1,
+        transition: 'opacity 0.5s',
+      }}>
+        <div style={{
+          width: '260px', height: '260px',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+        }}>
+          {pomodoroStyle === 'hourglass'
+            ? <Hourglass progress={progress} />
+            : <ArcPie progress={progress} />
+          }
+        </div>
+      </div>
+
+    </div>
+  );
+};
+
+export default PomodoroPage;
