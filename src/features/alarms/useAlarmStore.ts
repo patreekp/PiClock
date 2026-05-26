@@ -11,6 +11,7 @@ interface AlarmState {
   alarms: Alarm[];
   fetchAlarms: () => Promise<void>;
   addAlarm: (time: string, label: string) => Promise<void>;
+  updateAlarm: (id: number, time: string, label: string) => Promise<void>;
   toggleAlarm: (alarm: Alarm) => Promise<void>;
   deleteAlarm: (id: number) => Promise<void>;
 }
@@ -31,6 +32,21 @@ export const useAlarmStore = create<AlarmState>((set, get) => ({
     const newAlarm = await res.json();
     set({ alarms: [...get().alarms, newAlarm].sort((a, b) => a.time.localeCompare(b.time)) });
   },
+  updateAlarm: async (id, time, label) => {
+    const existing = get().alarms.find(a => a.id === id);
+    if (!existing) return;
+    const updated = { ...existing, time, label };
+    await fetch(`/api/alarms/${id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(updated),
+    });
+    set({
+      alarms: get()
+        .alarms.map(a => (a.id === id ? updated : a))
+        .sort((a, b) => a.time.localeCompare(b.time)),
+    });
+  },
   toggleAlarm: async (alarm) => {
     const updated = { ...alarm, enabled: alarm.enabled ? 0 : 1 };
     await fetch(`/api/alarms/${alarm.id}`, {
@@ -38,12 +54,10 @@ export const useAlarmStore = create<AlarmState>((set, get) => ({
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(updated),
     });
-    set({
-      alarms: get().alarms.map(a => a.id === alarm.id ? updated : a)
-    });
+    set({ alarms: get().alarms.map(a => (a.id === alarm.id ? updated : a)) });
   },
   deleteAlarm: async (id) => {
     await fetch(`/api/alarms/${id}`, { method: 'DELETE' });
     set({ alarms: get().alarms.filter(a => a.id !== id) });
-  }
+  },
 }));
