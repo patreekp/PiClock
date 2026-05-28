@@ -90,6 +90,21 @@ const SettingsPage = () => {
     };
     return () => es.close();
   }, []);
+  
+  const [cpuTemp, setCpuTemp] = useState<number | null>(null);
+
+  useEffect(() => {
+    const fetchTemp = async () => {
+      try {
+        const res = await fetch('/api/system/info');
+        const data = await res.json();
+        setCpuTemp(data.cpuTemp);
+      } catch (_) {}
+    };
+    fetchTemp();
+    const interval = setInterval(fetchTemp, 5000);
+    return () => clearInterval(interval);
+  }, []);
 
   const handleScan = async (onlyNew: boolean) => {
     setScanning(true);
@@ -121,7 +136,22 @@ const SettingsPage = () => {
 
   return (
     <div className="h-full p-8 flex flex-col overflow-y-auto select-none custom-scrollbar">
-      <h2 className="text-4xl font-bold mb-10 uppercase tracking-tighter">{t('settings.title')}</h2>
+      <div className="flex items-start justify-between mb-10">
+      <h2 className="text-4xl font-bold uppercase tracking-tighter">{t('settings.title')}</h2>
+      {cpuTemp !== null && (
+        <div style={{
+          display: 'flex', flexDirection: 'column', alignItems: 'flex-end',
+          gap: '2px', opacity: 0.55,
+        }}>
+          <span style={{ fontSize: '11px', fontWeight: 700, letterSpacing: '0.15em', textTransform: 'uppercase', color: 'var(--color-fg)' }}>
+            CPU
+          </span>
+          <span style={{ fontSize: '22px', fontWeight: 700, lineHeight: 1, color: 'var(--color-fg)', fontVariantNumeric: 'tabular-nums' }}>
+            {cpuTemp.toFixed(1)}°
+          </span>
+        </div>
+      )}
+    </div>
       <div className="space-y-10">
 
         {/* Theme */}

@@ -9,6 +9,7 @@ import { audioRouter } from './features/audio/audioRouter.js';
 import { initAlarmScheduler } from './features/alarms/alarmService.js';
 import { scanAudioLibrary } from './features/audio/audioLibraryService.js';
 import { getDb } from './db/database.js';
+import { systemRouter } from './features/system/systemRouter.js';
 
 const app = express();
 const PORT = 3000;
@@ -20,6 +21,7 @@ app.use('/api/todos', todosRouter);
 app.use('/api/alarms', alarmsRouter);
 app.use('/api/config', configRouter);
 app.use('/api/audio', audioRouter);
+app.use('/api/system', systemRouter);
 
 initDb();
 initAlarmScheduler();

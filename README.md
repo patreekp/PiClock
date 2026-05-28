@@ -25,6 +25,7 @@ Swipe between pages to access the clock, weather, to-do list, and alarms. No clo
 **Auto theme**  Light/dark mode that follows actual sunrise and sunset times, calculated with the NOAA solar formula from your configured coordinates.
 
 **Internationalisation**  Full EN/IT interface, persisted in SQLite. Easily extensible to other languages by adding keys to `src/i18n/translations.ts`.
+
 ---
 
 ## Pages
