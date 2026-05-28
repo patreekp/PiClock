@@ -143,7 +143,7 @@ function startAudioLoop(alarm) {
   audioLoopActive = true;
   let firstPlay = true;
 
-  function playNext() {
+  async function playNext() {
     if (!audioLoopActive) {
       console.log(`[Audio] Loop interrotto, non riparte`);
       return;
@@ -168,7 +168,18 @@ function startAudioLoop(alarm) {
       skipSeconds = 0;
     }
 
-    currentTrackName = path.basename(filePath, path.extname(filePath));
+    const fallbackName = path.basename(filePath, path.extname(filePath));
+    let trackDisplay = fallbackName;
+    try {
+      const { parseFile } = await import('music-metadata');
+      const meta = await parseFile(filePath);
+      const title = meta.common.title?.trim();
+      const artist = meta.common.artist?.trim();
+      if (title && artist) trackDisplay = `${title} — ${artist}`;
+      else if (title) trackDisplay = title;
+      else if (artist) trackDisplay = `${fallbackName} — ${artist}`;
+    } catch (_) {}
+    currentTrackName = trackDisplay;
     if (alarm) emitAlarmTriggered({ ...alarm, trackName: currentTrackName });
 
     const proc = spawnAudioProcess(filePath, skipSeconds);

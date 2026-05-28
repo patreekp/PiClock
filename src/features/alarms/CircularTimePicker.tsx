@@ -15,8 +15,6 @@ type Mode = 'hours' | 'minutes';
 
 const pad = (n: number) => String(n).padStart(2, '0');
 
-// Dial dimensionato per stare in 480px:
-// header ~110px + label ~20px + display ~80px + dial 220px + bottoni 52px = 482px → ok
 const R_OUTER = 88;
 const R_INNER = 57;
 const SVG_SIZE = 220;
@@ -39,6 +37,14 @@ const CircularTimePicker: React.FC<Props> = ({
   const svgRef = useRef<SVGSVGElement>(null);
 
   const buildTime = useCallback((h: number, m: number) => `${pad(h)}:${pad(m)}`, []);
+
+  const adjustMinutes = useCallback((delta: number) => {
+    setMinutes(prev => {
+      const next = (prev + delta + 60) % 60;
+      onChange(buildTime(hours, next));
+      return next;
+    });
+  }, [hours, onChange, buildTime]);
 
   const hitFromEvent = useCallback((clientX: number, clientY: number) => {
     if (!svgRef.current) return null;
@@ -71,7 +77,6 @@ const CircularTimePicker: React.FC<Props> = ({
     }
   }, [mode, hours, minutes, onChange, buildTime, hitFromEvent]);
 
-  // Stop propagation su tutti gli eventi del contenitore
   const stopProp = (e: React.SyntheticEvent) => e.stopPropagation();
 
   const handleClick = (e: React.MouseEvent<SVGSVGElement>) => {
@@ -111,27 +116,65 @@ const CircularTimePicker: React.FC<Props> = ({
       );
     }
   } else {
+    // Lancetta sempre al minuto esatto (0–59), indipendentemente dal dial a step 5
+    const exactAngle = minutes * 6; // 360° / 60 min = 6° per minuto
+    const exactRad = ((exactAngle - 90) * Math.PI) / 180;
+    const exactX = R_OUTER * Math.cos(exactRad);
+    const exactY = R_OUTER * Math.sin(exactRad);
+    items.push(<line key="line-m-exact" x1={0} y1={0} x2={exactX} y2={exactY} stroke="var(--color-fg)" strokeWidth={1.5} opacity={0.35} />);
+    items.push(<circle key="sel-m-exact" cx={exactX} cy={exactY} r={HIT_R} fill="var(--color-fg)" />);
+    items.push(
+      <text key="sel-m-exact-label" x={exactX} y={exactY} textAnchor="middle" dominantBaseline="central"
+        fontSize={12} fontFamily="inherit" fontWeight={700}
+        fill="var(--color-bg)">
+        {pad(minutes)}
+      </text>
+    );
+
+    // Tacche a step 5 sull'anello — etichette, senza pallino se già coperte dalla lancetta esatta
     for (let i = 0; i < 12; i++) {
       const m = i * 5;
       const angle = i * 30;
       const rad = ((angle - 90) * Math.PI) / 180;
       const x = R_OUTER * Math.cos(rad);
       const y = R_OUTER * Math.sin(rad);
-      const selected = minutes === m;
-      if (selected) {
-        items.push(<line key={`line-m${i}`} x1={0} y1={0} x2={x} y2={y} stroke="var(--color-fg)" strokeWidth={1.5} opacity={0.35} />);
-        items.push(<circle key={`sel-m${i}`} cx={x} cy={y} r={HIT_R} fill="var(--color-fg)" />);
-      }
+      if (minutes === m) continue; // già disegnato dalla lancetta esatta
       items.push(
         <text key={`m-${i}`} x={x} y={y} textAnchor="middle" dominantBaseline="central"
-          fontSize={12} fontFamily="inherit"
-          fontWeight={selected ? 700 : 400}
-          fill={selected ? 'var(--color-bg)' : 'var(--color-fg)'}>
+          fontSize={12} fontFamily="inherit" fontWeight={400}
+          fill="var(--color-fg)">
           {pad(m)}
         </text>
       );
     }
   }
+
+  // Bottone laterale +1/-1
+  const SideButton = ({
+    delta, label, side,
+  }: {
+    delta: number; label: string; side: 'left' | 'right';
+  }) => (
+    <button
+      onClick={(e) => { e.stopPropagation(); adjustMinutes(delta); }}
+      onTouchEnd={(e) => { e.stopPropagation(); e.preventDefault(); adjustMinutes(delta); }}
+      className="flex flex-col items-center justify-center font-bold transition-opacity hover:opacity-60 active:opacity-40"
+      style={{
+        width: '64px',
+        height: SVG_SIZE + 'px',
+        fontSize: '22px',
+        opacity: 0.9,
+        color: 'var(--color-fg)',
+        flexShrink: 0,
+      }}
+      aria-label={`${delta > 0 ? 'Aumenta' : 'Diminuisci'} minuti di 1`}
+    >
+      <span style={{ fontSize: '11px', fontWeight: 700, letterSpacing: '0.1em', opacity: 0.45, marginBottom: '4px' }}>
+        {delta > 0 ? '+1' : '−1'}
+      </span>
+      <span style={{ fontSize: '28px', lineHeight: 1 }}>{label}</span>
+    </button>
+  );
 
   return (
     <div
@@ -161,21 +204,37 @@ const CircularTimePicker: React.FC<Props> = ({
         </button>
       </div>
 
-      {/* Dial */}
-      <svg
-        ref={svgRef}
-        width={SVG_SIZE} height={SVG_SIZE}
-        viewBox={`${-SVG_SIZE / 2} ${-SVG_SIZE / 2} ${SVG_SIZE} ${SVG_SIZE}`}
-        onClick={handleClick}
-        onTouchEnd={handleTouchEnd}
-        style={{ touchAction: 'none', cursor: 'pointer' }}
-      >
-        <circle r={102} fill="var(--color-fg)" opacity={0.07} />
-        <circle r={4} fill="var(--color-fg)" opacity={0.4} />
-        {items}
-      </svg>
+      {/* Dial + bottoni laterali */}
+      <div className="flex items-center justify-center" style={{ width: '100%' }}>
+        {/* Bottone -1: placeholder invisibile in modalità ore per mantenere layout stabile */}
+        {mode === 'minutes' ? (
+          <SideButton delta={-1} label="−" side="left" />
+        ) : (
+          <div style={{ width: '64px', height: SVG_SIZE + 'px', flexShrink: 0 }} />
+        )}
 
-      {/* Bottoni — full width, isolati dal panel esterno */}
+        <svg
+          ref={svgRef}
+          width={SVG_SIZE} height={SVG_SIZE}
+          viewBox={`${-SVG_SIZE / 2} ${-SVG_SIZE / 2} ${SVG_SIZE} ${SVG_SIZE}`}
+          onClick={handleClick}
+          onTouchEnd={handleTouchEnd}
+          style={{ touchAction: 'none', cursor: 'pointer', flexShrink: 0 }}
+        >
+          <circle r={102} fill="var(--color-fg)" opacity={0.07} />
+          <circle r={4} fill="var(--color-fg)" opacity={0.4} />
+          {items}
+        </svg>
+
+        {/* Bottone +1 */}
+        {mode === 'minutes' ? (
+          <SideButton delta={1} label="+" side="right" />
+        ) : (
+          <div style={{ width: '64px', height: SVG_SIZE + 'px', flexShrink: 0 }} />
+        )}
+      </div>
+
+      {/* Bottoni azione — full width */}
       <div className="flex" style={{ borderTop: '1px solid var(--color-fg)', width: '100%', marginTop: '8px' }}>
         {onDelete && (
           <button
