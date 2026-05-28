@@ -18,7 +18,7 @@ Swipe between pages to access the clock, weather, to-do list, and alarms. No clo
 
 **To-do list**  Simple, persistent task list backed by SQLite. Add, check off, and delete tasks with touch-friendly controls.
 
-**Alarms**  Scheduled with `node-schedule`, plays audio files in a loop from a local folder. Configurable snooze (1, 5, or 10 minutes). The alarm modal takes over the full screen when triggered, with Stop and Snooze buttons.
+**Alarms**  Scheduled with `node-schedule`, plays audio files in a loop from a local folder. Configurable snooze (1, 5, or 10 minutes). The alarm modal takes over the full screen when triggered, with Stop and Snooze buttons. Stopping an alarm automatically navigates to the Weather page.
 
 **Song Highlights**  Uses `ffmpeg` (ebur128 loudness analysis) to detect the most intense moment of each audio file. Alarms start from that highlight instead of the beginning  so you wake up to the best part of the track. The library is scanned asynchronously at boot; progress is streamed live via SSE.
 

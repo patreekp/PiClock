@@ -47,8 +47,11 @@ setTimeout(() => {
 // uncomment after running npm run build
 // after that you'll only need to launch npm run server: dash will be available at http://localhost:3000
 
+/*
 import { fileURLToPath } from 'url';
 import path from 'path';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 app.use(express.static(path.join(__dirname, '../dist')));
+*/
+
 app.listen(PORT, () => console.log(`PiClock server running on http://localhost:${PORT}`));

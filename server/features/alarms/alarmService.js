@@ -9,6 +9,7 @@ const activeJobs = new Map();
 const sseClients = new Set();
 let currentAudioProc = null;
 let audioLoopActive = false;
+let currentTrackName = null;
 
 // ── SSE client registry ───────────────────────────────────────────────────────
 export function addSseClient(res) {
@@ -24,6 +25,10 @@ function emitAlarmTriggered(alarm) {
 export function emitAlarmStopped() {
   const data = JSON.stringify({ type: 'alarm:stopped' });
   for (const res of sseClients) res.write(`data: ${data}\n\n`);
+}
+
+export function getCurrentTrackName() {
+  return currentTrackName;
 }
 
 // ── Audio ─────────────────────────────────────────────────────────────────────
@@ -130,7 +135,7 @@ function pickRandomFileFallback(folder, files) {
   return { filePath, skipSeconds: 0 };
 }
 
-function startAudioLoop() {
+function startAudioLoop(alarm) {
   const result = getAudioFiles();
   if (!result) return;
 
@@ -147,7 +152,6 @@ function startAudioLoop() {
     let filePath, skipSeconds;
 
     if (firstPlay) {
-      // Primo brano: prova a usare highlight dal DB
       const track = pickAlarmTrack(folder);
       if (track) {
         filePath = track.filePath;
@@ -159,11 +163,13 @@ function startAudioLoop() {
       }
       firstPlay = false;
     } else {
-      // Brani successivi: sempre random da 00:00
       const picked = pickRandomFileFallback(folder, files);
       filePath = picked.filePath;
       skipSeconds = 0;
     }
+
+    currentTrackName = path.basename(filePath, path.extname(filePath));
+    if (alarm) emitAlarmTriggered({ ...alarm, trackName: currentTrackName });
 
     const proc = spawnAudioProcess(filePath, skipSeconds);
 
@@ -185,6 +191,7 @@ function startAudioLoop() {
 export function stopAlarmAudio() {
   console.log(`[Audio] Stop — loop: ${audioLoopActive}, proc PID: ${currentAudioProc?.pid ?? 'nessuno'}`);
   audioLoopActive = false;
+  currentTrackName = null;
 
   if (currentAudioProc) {
     try {
@@ -214,8 +221,7 @@ function scheduleAlarm(alarm) {
   const [hour, minute] = alarm.time.split(':').map(Number);
   const job = schedule.scheduleJob(`${minute} ${hour} * * *`, () => {
     console.log(`[Alarm] ⏰ Triggered: [${alarm.id}] "${alarm.label}" alle ${alarm.time}`);
-    startAudioLoop();
-    emitAlarmTriggered(alarm);
+    startAudioLoop(alarm);
   });
 
   activeJobs.set(alarm.id, job);
@@ -233,8 +239,7 @@ export function snoozeAlarm(alarm) {
 
   const job = schedule.scheduleJob(snoozeAt, () => {
     console.log(`[Snooze] ⏰ Snooze triggered: [${alarm.id}] "${alarm.label}"`);
-    startAudioLoop();
-    emitAlarmTriggered(alarm);
+    startAudioLoop(alarm);
     activeJobs.delete(`snooze_${alarm.id}`);
   });
 

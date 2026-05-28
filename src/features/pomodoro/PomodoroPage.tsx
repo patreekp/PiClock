@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useAppStore } from '../../store/useAppStore';
 import { useTranslation } from '../../i18n/useTranslation';
+import bellSound from '../../assets/sounds/bell.mp3';
 
 type Phase = 'focus' | 'shortBreak' | 'longBreak';
 
@@ -10,6 +11,15 @@ interface TimerState {
   secondsLeft: number;
   running: boolean;
   cycleComplete: boolean;
+}
+
+// ── Bell sound ────────────────────────────────────────────────────────────────
+function playBell() {
+  try {
+    const audio = new Audio(bellSound);
+    audio.volume = 0.8;
+    audio.play().catch(() => {});
+  } catch (_) {}
 }
 
 // ── Hourglass SVG ─────────────────────────────────────────────────────────────
@@ -144,28 +154,35 @@ const PomodoroPage = () => {
     if (intervalRef.current !== null) { clearInterval(intervalRef.current); intervalRef.current = null; }
   }, []);
 
-  const computeNextState = useCallback((current: TimerState): TimerState => {
+  const computeNextState = useCallback((current: TimerState, autoAdvance = false): TimerState => {
     const sessions = sessionsRef.current;
     const getDur = getDurationRef.current;
     if (current.phase === 'focus') {
       const nextIdx = current.sessionIndex + 1;
+      // Ciclo completo — si ferma, l'utente deve premere play per ricominciare
       if (nextIdx >= sessions) return { phase: 'focus', sessionIndex: 0, secondsLeft: getDur('focus'), running: false, cycleComplete: true };
       const nextPhase: Phase = nextIdx === sessions - 1 ? 'longBreak' : 'shortBreak';
-      return { phase: nextPhase, sessionIndex: nextIdx, secondsLeft: getDur(nextPhase), running: false, cycleComplete: false };
+      return { phase: nextPhase, sessionIndex: nextIdx, secondsLeft: getDur(nextPhase), running: autoAdvance, cycleComplete: false };
     }
-    return { phase: 'focus', sessionIndex: current.sessionIndex, secondsLeft: getDur('focus'), running: false, cycleComplete: false };
+    // Fine break → torna a focus
+    return { phase: 'focus', sessionIndex: current.sessionIndex, secondsLeft: getDur('focus'), running: autoAdvance, cycleComplete: false };
   }, []);
 
-  useEffect(() => {
+useEffect(() => {
     if (!timer.running) { stopInterval(); return; }
     stopInterval();
     intervalRef.current = setInterval(() => {
       const current = timerRef.current;
-      if (current.secondsLeft <= 1) { stopInterval(); setTimer(computeNextState(current)); return; }
+      if (current.secondsLeft <= 1) {
+        stopInterval();
+        playBell();
+        setTimer(computeNextState(current, true));
+        return;
+      }
       setTimer(prev => ({ ...prev, secondsLeft: prev.secondsLeft - 1 }));
     }, 1000);
     return stopInterval;
-  }, [timer.running, computeNextState, stopInterval]);
+  }, [timer.running, timer.phase, computeNextState, stopInterval]);
 
   useEffect(() => {
     if (!timerRef.current.running && !timerRef.current.cycleComplete)
@@ -175,7 +192,10 @@ const PomodoroPage = () => {
   useEffect(() => stopInterval, [stopInterval]);
 
   const handlePlayPause = () => {
-    if (timer.cycleComplete) { setTimer({ phase: 'focus', sessionIndex: 0, secondsLeft: getDuration('focus'), running: true, cycleComplete: false }); return; }
+    if (timer.cycleComplete) {
+      setTimer({ phase: 'focus', sessionIndex: 0, secondsLeft: getDuration('focus'), running: true, cycleComplete: false });
+      return;
+    }
     setTimer(prev => ({ ...prev, running: !prev.running }));
   };
   const handleNext = () => { stopInterval(); setTimer(prev => computeNextState(prev)); };
@@ -267,7 +287,6 @@ const PomodoroPage = () => {
         opacity: cycleComplete ? 0.2 : 1,
         transition: 'opacity 0.5s',
       }}>
-        {/* Dimensione fissa per stare nel 480px di altezza con i padding */}
         <div style={{ width: '320px', height: '320px' }}>
           {pomodoroStyle === 'hourglass'
             ? <Hourglass progress={progress} />

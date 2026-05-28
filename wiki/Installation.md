@@ -77,7 +77,7 @@ npm run server
 
 Starts the Express server on `http://localhost:3000`.
 
-On first run, the server automatically creates the SQLite database file (`raspiclockdb.sqlite`) in the project root with default configuration values.
+On first run, the server automatically creates the SQLite database file (`piclockdb.sqlite`) in the project root with default configuration values.
 
 ### Terminal 2 — Frontend
 
@@ -221,7 +221,7 @@ piclock/
 │       ├── todos/TodosPage.tsx
 │       ├── alarms/AlarmsPage.tsx + AlarmModal.tsx
 │       └── settings/SettingsPage.tsx
-├── raspiclockdb.sqlite                   # Auto-generated on first run
+├── piclockdb.sqlite                   # Auto-generated on first run
 ├── package.json
 ├── vite.config.ts
 └── tailwind.config.ts

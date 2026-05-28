@@ -1,22 +1,22 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Bell, X, AlarmClock } from 'lucide-react';
+import { useAppStore } from '../../store/useAppStore';
 
 interface ActiveAlarm {
   id: number;
   time: string;
   label: string;
+  trackName?: string;
 }
+
+// WeatherPage è la pagina index 1 nel carousel (Clock=0, Weather=1, ...)
+// Adatta il numero se nel tuo carousel l'ordine è diverso
+const WEATHER_PAGE_INDEX = 1;
 
 const AlarmModal = () => {
   const [activeAlarm, setActiveAlarm] = useState<ActiveAlarm | null>(null);
-  const [snoozeMinutes, setSnoozeMinutes] = useState(1);
-
-  useEffect(() => {
-    fetch('/api/config')
-      .then(r => r.json())
-      .then(d => setSnoozeMinutes(parseInt(d.snoozeMinutes ?? '1', 10)))
-      .catch(() => {});
-  }, []);
+  const { config, setPage } = useAppStore();
+  const snoozeMinutes = config.snoozeMinutes;
 
   useEffect(() => {
     const es = new EventSource('/api/alarms/events');
@@ -34,6 +34,7 @@ const AlarmModal = () => {
     if (!activeAlarm) return;
     try { await fetch(`/api/alarms/${activeAlarm.id}/stop`, { method: 'POST' }); } catch (_) {}
     setActiveAlarm(null);
+    setPage(WEATHER_PAGE_INDEX);
   };
 
   const handleSnooze = async () => {
@@ -62,6 +63,15 @@ const AlarmModal = () => {
         <div className="text-sm uppercase tracking-[0.3em] opacity-50 font-bold">
           {activeAlarm.label || 'Sveglia'}
         </div>
+        {/* Nome brano */}
+        {activeAlarm.trackName && (
+          <div
+            className="text-xs tracking-widest"
+            style={{ opacity: 0.35, fontWeight: 600, letterSpacing: '0.15em', textTransform: 'uppercase' }}
+          >
+            ♪ {activeAlarm.trackName}
+          </div>
+        )}
       </div>
 
       {/* Bottom buttons */}
@@ -77,7 +87,7 @@ const AlarmModal = () => {
           <span className="text-xs opacity-50 uppercase tracking-widest">+{snoozeMinutes} min</span>
         </button>
 
-        {/* Stop — inverted colors with inline style to avoid Tailwind class issues */}
+        {/* Stop */}
         <button
           onClick={handleStop}
           className="flex-1 flex flex-col items-center justify-center gap-2 py-8 hover:opacity-90 transition-opacity active:opacity-75"
