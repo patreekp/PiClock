@@ -10,7 +10,7 @@ Swipe between pages to access the clock, weather, to-do list, and alarms. No clo
 
 ## What it does
 
-**Clock**  12h/24h format, optional seconds, configurable timezone. Clean, full-screen display optimized for e-paper-style readability at a glance. Shows next alarm time and system notifications (library scan progress, errors) as a live banner.
+**Clock**  12h/24h format, optional seconds, configurable timezone. Clean, full-screen display optimized for e-paper-style readability at a glance. Shows next alarm time and system notifications (library scan progress, errors) as a live banner. When a scheduled alarm is marked to be skipped, the clock indicator reflects that state visually.
 
 **Weather**  Powered by [Open-Meteo](https://open-meteo.com/) (free, no API key required). 5-day forecast with caching to minimize network calls.
 
@@ -20,7 +20,9 @@ Swipe between pages to access the clock, weather, to-do list, and alarms. No clo
 
 **Alarms**  Scheduled with `node-schedule`, plays audio files in a loop from a local folder. Configurable snooze (1, 5, or 10 minutes). The alarm modal takes over the full screen when triggered, with Stop and Snooze buttons. Stopping an alarm automatically navigates to the Weather page.
 
-**Song Highlights**  Uses `ffmpeg` (ebur128 loudness analysis) to detect the most intense moment of each audio file. Alarms start from that highlight instead of the beginning  so you wake up to the best part of the track. The library is scanned asynchronously at boot; progress is streamed live via SSE.
+Alarms support per-weekday scheduling — set an alarm to ring only on specific days of the week, or leave all days unselected for a daily alarm. Each alarm also has a **Skip next** button: one tap silently skips the next occurrence and automatically resets afterward, so no manual follow-up is needed.
+
+**Song Highlights**  Uses `ffmpeg` (ebur128 loudness analysis) to detect the most intense moment of each audio file. Alarms start from that highlight instead of the beginning — so you wake up to the best part of the track. The library is scanned asynchronously at boot; progress is streamed live via SSE.
 
 **Auto theme**  Light/dark mode that follows actual sunrise and sunset times, calculated with the NOAA solar formula from your configured coordinates.
 
@@ -30,15 +32,15 @@ Swipe between pages to access the clock, weather, to-do list, and alarms. No clo
 
 ## Pages
 
-The interface is a horizontal swipe carousel  four pages, all navigable by touch or mouse drag.
+The interface is a horizontal swipe carousel — four pages, all navigable by touch or mouse drag.
 
-| Page | Content | Preview | 
+| Page | Content | Preview |
 |---|---|---|
-| Clock | Time, date, next alarm indicator, system notifications | ![Screenshot](wiki/clockPageWhiteTheme.png) ![Screenshot](wiki/clockPageDarkTheme.png) | 
-| Weather | Current conditions + 5-day forecast | ![Screenshot](wiki/weatherPageLightTheme.png) | 
-| Focus | Focus timer with hourglass or arc visual, session pips, controls | ![Screenshot](wiki/focusPageArcLightTheme.png) ![Screenshot](wiki/focusPageHourglassLightTheme.png) | 
-| To-do | Task list with add/complete/delete | ![Screenshot](wiki/todoPageLightTheme.png) | 
-| Alarms | Alarm management | ![Screenshot](wiki/alarmsPageLightTheme.png) ![Screenshot](wiki/alarmsPageEditLightTheme.png)| 
+| Clock | Time, date, next alarm indicator, system notifications | ![Screenshot](wiki/clockPageWhiteTheme.png) ![Screenshot](wiki/clockPageDarkTheme.png) |
+| Weather | Current conditions + 5-day forecast | ![Screenshot](wiki/weatherPageLightTheme.png) |
+| Focus | Focus timer with hourglass or arc visual, session pips, controls | ![Screenshot](wiki/focusPageArcLightTheme.png) ![Screenshot](wiki/focusPageHourglassLightTheme.png) |
+| To-do | Task list with add/complete/delete | ![Screenshot](wiki/todoPageLightTheme.png) |
+| Alarms | Alarm list with per-day scheduling and skip-next control | ![Screenshot](wiki/alarmsPageLightTheme.png) ![Screenshot](wiki/alarmsPageEditLightTheme.png) |
 | Settings | Settings management | ![Screenshot](wiki/settingsPageLightTheme.png) |
 
 ---
@@ -68,10 +70,10 @@ npm install
 Then open two terminals:
 
 ```bash
-# Terminal 1  backend
+# Terminal 1 — backend
 npm run server
 
-# Terminal 2  frontend
+# Terminal 2 — frontend
 npm run dev
 ```
 

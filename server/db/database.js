@@ -25,6 +25,11 @@ export function initDb() {
       scanned_at TEXT
     );
   `);
+
+// Migration: aggiunge colonne giorni e skip_next se non esistono
+try { db.exec(`ALTER TABLE alarms ADD COLUMN days TEXT NOT NULL DEFAULT '[]'`); } catch (_) {}
+try { db.exec(`ALTER TABLE alarms ADD COLUMN skip_next INTEGER NOT NULL DEFAULT 0`); } catch (_) {}
+
   const insert = db.prepare(`INSERT OR IGNORE INTO config (key, value) VALUES (?, ?)`);
   for (const [key, value] of Object.entries({
     lat: '44.0594', lon: '12.5683', timezone: 'Europe/Rome',

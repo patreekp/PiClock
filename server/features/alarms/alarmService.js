@@ -27,6 +27,11 @@ export function emitAlarmStopped() {
   for (const res of sseClients) res.write(`data: ${data}\n\n`);
 }
 
+export function emitAlarmSkipped(alarmId) {
+  const data = JSON.stringify({ type: 'alarm:skipped', alarmId });
+  for (const res of sseClients) res.write(`data: ${data}\n\n`);
+}
+
 export function getCurrentTrackName() {
   return currentTrackName;
 }
@@ -230,13 +235,29 @@ function scheduleAlarm(alarm) {
   }
 
   const [hour, minute] = alarm.time.split(':').map(Number);
-  const job = schedule.scheduleJob(`${minute} ${hour} * * *`, () => {
+
+  // days: array JS di interi 0-6 (0=Dom). Vuoto = ogni giorno.
+  let days = [];
+  try { days = JSON.parse(alarm.days || '[]'); } catch (_) {}
+  const dayExpr = days.length > 0 ? days.join(',') : '*';
+
+  const job = schedule.scheduleJob(`${minute} ${hour} * * ${dayExpr}`, () => {
     console.log(`[Alarm] ⏰ Triggered: [${alarm.id}] "${alarm.label}" alle ${alarm.time}`);
+
+    // Controlla skip_next — rilegge dal DB per avere il valore aggiornato
+    const row = getDb().prepare('SELECT skip_next FROM alarms WHERE id = ?').get(alarm.id);
+    if (row?.skip_next) {
+      getDb().prepare('UPDATE alarms SET skip_next = 0 WHERE id = ?').run(alarm.id);
+      console.log(`[Alarm] ⏭ Alarm ${alarm.id} saltato (skip_next), reset flag`);
+      emitAlarmSkipped(alarm.id);
+      return;
+    }
+
     startAudioLoop(alarm);
   });
 
   activeJobs.set(alarm.id, job);
-  console.log(`[Scheduler] Alarm ${alarm.id} schedulato per le ${alarm.time}`);
+  console.log(`[Scheduler] Alarm ${alarm.id} schedulato — ${alarm.time}, giorni: ${dayExpr}`);
 }
 
 export function snoozeAlarm(alarm) {

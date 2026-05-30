@@ -5,6 +5,7 @@ const translations = {
     // Clock
     'clock.alarmIn': 'Alarm at',
     'clock.appLabel': 'PiClock Active',
+    'clock.alarmSkipped': 'Skipped at {time}',
 
     // Todos
     'todos.title': 'To-do',
@@ -22,6 +23,25 @@ const translations = {
     'alarms.editAlarm': 'Edit Alarm',
     'alarms.cancel': 'Cancel',
     'alarms.delete': 'Delete',
+    'alarms.days.mon': 'M',
+    'alarms.days.tue': 'T',
+    'alarms.days.wed': 'W',
+    'alarms.days.thu': 'T',
+    'alarms.days.fri': 'F',
+    'alarms.days.sat': 'S',
+    'alarms.days.sun': 'S',
+    'alarms.days.mon3': 'Mon',
+    'alarms.days.tue3': 'Tue',
+    'alarms.days.wed3': 'Wed',
+    'alarms.days.thu3': 'Thu',
+    'alarms.days.fri3': 'Fri',
+    'alarms.days.sat3': 'Sat',
+    'alarms.days.sun3': 'Sun',
+    'alarms.days.daily': 'Every day',
+    'alarms.days.weekdays': 'Weekdays',
+    'alarms.days.weekend': 'Weekend',
+    'alarms.skipNext': 'Skip next',
+    'alarms.skipNextActive': 'Will skip next ring',
 
     // Alarm Modal
     'alarmModal.snooze': 'Snooze',
@@ -119,6 +139,7 @@ const translations = {
     // Clock
     'clock.alarmIn': 'Sveglia alle',
     'clock.appLabel': 'PiClock Active',
+    'clock.alarmSkipped': 'Saltata alle {time}',
 
     // Todos
     'todos.title': 'Cose da fare',
@@ -136,6 +157,25 @@ const translations = {
     'alarms.editAlarm': 'Modifica Sveglia',
     'alarms.cancel': 'Annulla',
     'alarms.delete': 'Elimina',
+    'alarms.days.mon': 'L',
+    'alarms.days.tue': 'M',
+    'alarms.days.wed': 'M',
+    'alarms.days.thu': 'G',
+    'alarms.days.fri': 'V',
+    'alarms.days.sat': 'S',
+    'alarms.days.sun': 'D',
+    'alarms.days.mon3': 'Lun',
+    'alarms.days.tue3': 'Mar',
+    'alarms.days.wed3': 'Mer',
+    'alarms.days.thu3': 'Gio',
+    'alarms.days.fri3': 'Ven',
+    'alarms.days.sat3': 'Sab',
+    'alarms.days.sun3': 'Dom',
+    'alarms.days.daily': 'Ogni giorno',
+    'alarms.days.weekdays': 'Feriali',
+    'alarms.days.weekend': 'Weekend',
+    'alarms.skipNext': 'Salta prossima',
+    'alarms.skipNextActive': 'Salterà la prossima',
 
     // Alarm Modal
     'alarmModal.snooze': 'Snooze',

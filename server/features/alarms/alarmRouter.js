@@ -51,27 +51,52 @@ alarmsRouter.post('/:id/snooze', (req, res) => {
 
 // ── CRUD ──────────────────────────────────────────────────────────────────────
 alarmsRouter.get('/', (req, res) => {
-  try { res.json(getDb().prepare('SELECT id, time, label, enabled FROM alarms ORDER BY time ASC').all()); }
-  catch (e) { res.status(500).json({ error: 'Failed to fetch alarms' }); }
+  try {
+    const rows = getDb()
+      .prepare('SELECT id, time, label, enabled, days, skip_next FROM alarms ORDER BY time ASC')
+      .all();
+    const alarms = rows.map(r => ({
+      ...r,
+      days: JSON.parse(r.days || '[]'),
+      skip_next: r.skip_next === 1,
+    }));
+    res.json(alarms);
+  } catch (e) { res.status(500).json({ error: 'Failed to fetch alarms' }); }
 });
-
 alarmsRouter.post('/', (req, res) => {
   try {
-    const { time, label = '', enabled = true } = req.body;
+    const { time, label = '', enabled = true, days = [] } = req.body;
     if (!time) return res.status(400).json({ error: 'time is required' });
-    const result = getDb().prepare('INSERT INTO alarms (time, label, enabled) VALUES (?, ?, ?)').run(time, label, enabled ? 1 : 0);
-    const alarm = { id: result.lastInsertRowid, time, label, enabled: enabled ? 1 : 0 };
-    rescheduleAlarm(alarm);
+    const daysJson = JSON.stringify(days);
+    const result = getDb()
+      .prepare('INSERT INTO alarms (time, label, enabled, days, skip_next) VALUES (?, ?, ?, ?, 0)')
+      .run(time, label, enabled ? 1 : 0, daysJson);
+    const alarm = { id: result.lastInsertRowid, time, label, enabled: enabled ? 1 : 0, days, skip_next: 0 };
+    rescheduleAlarm({ ...alarm, days: daysJson });
     res.status(201).json(alarm);
   } catch (e) { res.status(500).json({ error: 'Failed to create alarm' }); }
 });
 
+alarmsRouter.post('/:id/skip-next', (req, res) => {
+  try {
+    const id = Number(req.params.id);
+    const alarm = getDb().prepare('SELECT skip_next FROM alarms WHERE id = ?').get(id);
+    if (!alarm) return res.status(404).json({ error: 'Alarm not found' });
+    const newVal = alarm.skip_next ? 0 : 1;
+    getDb().prepare('UPDATE alarms SET skip_next = ? WHERE id = ?').run(newVal, id);
+    res.json({ skip_next: newVal === 1 });
+  } catch (e) { res.status(500).json({ error: 'Failed to toggle skip_next' }); }
+});
+
 alarmsRouter.put('/:id', (req, res) => {
   try {
-    const { time, label, enabled } = req.body;
-    getDb().prepare('UPDATE alarms SET time = ?, label = ?, enabled = ? WHERE id = ?').run(time, label, enabled ? 1 : 0, req.params.id);
-    const alarm = { id: Number(req.params.id), time, label, enabled: enabled ? 1 : 0 };
-    rescheduleAlarm(alarm);
+    const { time, label, enabled, days = [], skip_next = 0 } = req.body;
+    const daysJson = JSON.stringify(days);
+    getDb()
+      .prepare('UPDATE alarms SET time = ?, label = ?, enabled = ?, days = ?, skip_next = ? WHERE id = ?')
+      .run(time, label, enabled ? 1 : 0, daysJson, skip_next ? 1 : 0, req.params.id);
+    const alarm = { id: Number(req.params.id), time, label, enabled: enabled ? 1 : 0, days, skip_next };
+    rescheduleAlarm({ ...alarm, days: daysJson });
     res.json(alarm);
   } catch (e) { res.status(500).json({ error: 'Failed to update alarm' }); }
 });

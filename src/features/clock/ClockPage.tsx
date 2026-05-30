@@ -34,7 +34,7 @@ const ClockPage = () => {
     return () => es.close();
   }, [language]);
 
-  const nextAlarm = alarms.filter(a => !!a.enabled).find(a => {
+  const upcomingAlarm = alarms.filter(a => !!a.enabled).find(a => {
     const [h, m] = a.time.split(':').map(Number);
     const alarmDate = new Date(now);
     alarmDate.setHours(h, m, 0, 0);
@@ -42,6 +42,8 @@ const ClockPage = () => {
     const diff = (alarmDate.getTime() - now.getTime()) / (1000 * 60);
     return diff > 0 && diff <= 60;
   });
+  const nextAlarmSkipped = upcomingAlarm?.skip_next ?? false;
+  const nextAlarm = upcomingAlarm ?? null;
 
   const tz = config.timezone || 'Europe/Rome';
   const locale = language === 'it' ? 'it-IT' : 'en-GB';
@@ -71,11 +73,18 @@ const ClockPage = () => {
       </div>
       <div className="mt-6 text-xl uppercase tracking-[0.2em] opacity-60 font-medium capitalize">{formattedDate}</div>
       {nextAlarm && (
-        <div className="mt-10 flex items-center gap-3 px-6 py-3 border border-current animate-pulse w-fit">
-          <Bell size={20} />
-          <span className="text-sm uppercase font-bold tracking-widest">{t('clock.alarmIn')} {nextAlarm.time}</span>
-        </div>
-      )}
+         <div
+            className="mt-10 flex items-center gap-3 px-6 py-3 border border-current w-fit"
+            style={{ opacity: nextAlarmSkipped ? 0.4 : 1 }}
+          >
+            <Bell size={20} className={nextAlarmSkipped ? 'opacity-40' : 'animate-pulse'} />
+            <span className="text-sm uppercase font-bold tracking-widest">
+              {nextAlarmSkipped
+                ? t('clock.alarmSkipped', { time: nextAlarm.time })
+                : `${t('clock.alarmIn')} ${nextAlarm.time}`}
+            </span>
+          </div>
+        )}
       <div className="absolute bottom-12 left-0 right-0 flex justify-center">
         <div className={`flex items-center gap-2 text-xs uppercase tracking-widest transition-opacity duration-500 ${isNotifying ? 'opacity-80' : 'opacity-20'}`}>
           <div className={`h-1 w-1 bg-current rounded-full ${isNotifying ? 'animate-pulse' : ''}`} />
