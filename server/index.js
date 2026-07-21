@@ -1,4 +1,6 @@
 import express from 'express';
+import { fileURLToPath } from 'url';
+import path from 'path';
 import { initDb } from './db/database.js';
 import { clockRouter } from './features/clock/clockRouter.js';
 import { weatherRouter } from './features/weather/weatherRouter.js';
@@ -11,8 +13,11 @@ import { scanAudioLibrary } from './features/audio/audioLibraryService.js';
 import { getDb } from './db/database.js';
 import { systemRouter } from './features/system/systemRouter.js';
 
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+
 const app = express();
-const PORT = 3000;
+const PORT = process.env.PORT || 80;
+const HOST = '0.0.0.0'; // ascolta su tutte le interfacce, non solo localhost
 
 app.use(express.json());
 app.use('/api/clock', clockRouter);
@@ -26,8 +31,6 @@ app.use('/api/system', systemRouter);
 initDb();
 initAlarmScheduler();
 
-// Scan automatico al boot se highlightMode !== 'off'
-// Gira in background, non blocca il server
 setTimeout(() => {
   try {
     const row = getDb().prepare(`SELECT value FROM config WHERE key = 'highlightMode'`).get();
@@ -43,17 +46,22 @@ setTimeout(() => {
   } catch (e) {
     console.error('[Boot] Errore lettura config highlightMode:', e.message);
   }
-}, 3000); // 3s di delay per dare tempo al DB di stabilizzarsi
+}, 3000);
 
+// --- Static frontend (build di produzione) ---
+// Richiede `npm run build` eseguito in precedenza (genera /dist)
+const distPath = path.join(__dirname, '../dist');
+app.use(express.static(distPath));
 
-// uncomment after running npm run build
-// after that you'll only need to launch npm run server: dash will be available at http://localhost:3000
+// Catch-all per il routing client-side (SPA): qualsiasi richiesta
+// non-API riceve index.html, lasciando fare a React il routing.
+// NB: uso un middleware invece di una route "*" per evitare i problemi
+// di path-to-regexp con Express 5.
+app.use((req, res, next) => {
+  if (req.path.startsWith('/api')) return next();
+  res.sendFile(path.join(distPath, 'index.html'));
+});
 
-/*
-import { fileURLToPath } from 'url';
-import path from 'path';
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-app.use(express.static(path.join(__dirname, '../dist')));
-*/
-
-app.listen(PORT, () => console.log(`PiClock server running on http://localhost:${PORT}`));
+app.listen(PORT, HOST, () => {
+  console.log(`PiClock server running on http://${HOST}:${PORT}`);
+});

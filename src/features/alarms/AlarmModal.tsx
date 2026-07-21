@@ -11,6 +11,7 @@ interface ActiveAlarm {
 
 // WeatherPage è la pagina index 1 nel carousel (Clock=0, Weather=1, ...)
 // Adatta il numero se nel tuo carousel l'ordine è diverso
+const CLOCK_PAGE_INDEX = 0; 
 const WEATHER_PAGE_INDEX = 1;
 
 const AlarmModal = () => {
@@ -34,7 +35,14 @@ const AlarmModal = () => {
     if (!activeAlarm) return;
     try { await fetch(`/api/alarms/${activeAlarm.id}/stop`, { method: 'POST' }); } catch (_) {}
     setActiveAlarm(null);
+    
+    // Cambia alla pagina del meteo immediatamente
     setPage(WEATHER_PAGE_INDEX);
+
+    // Dopo un minuto, cambia alla pagina dell'ora
+    setTimeout(() => {
+      setPage(CLOCK_PAGE_INDEX); // Supponiamo che CLOCK_PAGE_INDEX sia l'indice della pagina dell'ora
+    }, 60000); // 60000 millisecondi = 1 minuto
   };
 
   const handleSnooze = async () => {
