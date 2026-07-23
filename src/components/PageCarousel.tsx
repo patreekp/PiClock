@@ -1,6 +1,7 @@
 import React, { useEffect, useCallback } from 'react';
 import { useSwipeable } from 'react-swipeable';
 import { useAppStore } from '../store/useAppStore';
+import { usePomodoroStore } from '../store/usePomodoroStore';
 import ClockPage from '../features/clock/ClockPage';
 import WeatherPage from '../features/weather/WeatherPage';
 import PomodoroPage from '../features/pomodoro/PomodoroPage';
@@ -78,6 +79,9 @@ function isDaytime(lat: number, lon: number): boolean {
 const PageCarousel = () => {
   const { currentPage, setPage, theme, fetchConfig, config } = useAppStore();
 
+  const navigateSignal = usePomodoroStore(s => s.navigateSignal);
+  const connectPomodoro = usePomodoroStore(s => s.connect);
+
   const handlers = useSwipeable({
     onSwipedLeft:  () => setPage(Math.min(currentPage + 1, PAGES.length - 1)),
     onSwipedRight: () => setPage(Math.max(currentPage - 1, 0)),
@@ -86,6 +90,15 @@ const PageCarousel = () => {
   });
 
   useEffect(() => { fetchConfig(); }, []);
+
+  useEffect(() => { connectPomodoro(); }, [connectPomodoro]);
+
+  useEffect(() => {
+    if (navigateSignal > 0) {
+      const idx = PAGES.findIndex(p => p.label === 'Pomodoro');
+      if (idx !== -1) setPage(idx);
+    }
+  }, [navigateSignal]);
 
   const applyTheme = useCallback(() => {
     if (theme === 'auto') {

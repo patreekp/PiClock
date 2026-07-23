@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useAppStore } from '../../store/useAppStore';
+import { usePomodoroStore } from '../../store/usePomodoroStore';
 import { useTranslation } from '../../i18n/useTranslation';
 import bellSound from '../../assets/sounds/bell.mp3';
 
@@ -127,88 +128,53 @@ const IconBtn = ({ onClick, children, large, disabled }: {
 const PomodoroPage = () => {
   const { config } = useAppStore();
   const { t } = useTranslation();
+  const {
+    phase, sessionIndex, status, secondsLeft, endsAt,
+    phaseCompleteSignal, connect, start, pause, reset, skip,
+  } = usePomodoroStore();
 
-  const { pomodoroStyle, pomodoroFocusMin, pomodoroShortBreakMin, pomodoroLongBreakMin, pomodoroSessions } = config;
+  const { pomodoroStyle, pomodoroSessions } = config;
 
-  const getDuration = useCallback((p: Phase) => {
-    if (p === 'focus') return pomodoroFocusMin * 60;
-    if (p === 'shortBreak') return pomodoroShortBreakMin * 60;
-    return pomodoroLongBreakMin * 60;
-  }, [pomodoroFocusMin, pomodoroShortBreakMin, pomodoroLongBreakMin]);
+  useEffect(() => { connect(); }, [connect]);
 
-  const [timer, setTimer] = useState<TimerState>(() => ({
-    phase: 'focus', sessionIndex: 0,
-    secondsLeft: pomodoroFocusMin * 60,
-    running: false, cycleComplete: false,
-  }));
-
-  const timerRef = useRef<TimerState>(timer);
-  useEffect(() => { timerRef.current = timer; }, [timer]);
-  const getDurationRef = useRef(getDuration);
-  useEffect(() => { getDurationRef.current = getDuration; }, [getDuration]);
-  const sessionsRef = useRef(pomodoroSessions);
-  useEffect(() => { sessionsRef.current = pomodoroSessions; }, [pomodoroSessions]);
-  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
-
-  const stopInterval = useCallback(() => {
-    if (intervalRef.current !== null) { clearInterval(intervalRef.current); intervalRef.current = null; }
-  }, []);
-
-  const computeNextState = useCallback((current: TimerState, autoAdvance = false): TimerState => {
-    const sessions = sessionsRef.current;
-    const getDur = getDurationRef.current;
-    if (current.phase === 'focus') {
-      const nextIdx = current.sessionIndex + 1;
-      // Ciclo completo — si ferma, l'utente deve premere play per ricominciare
-      if (nextIdx >= sessions) return { phase: 'focus', sessionIndex: 0, secondsLeft: getDur('focus'), running: false, cycleComplete: true };
-      const nextPhase: Phase = nextIdx === sessions - 1 ? 'longBreak' : 'shortBreak';
-      return { phase: nextPhase, sessionIndex: nextIdx, secondsLeft: getDur(nextPhase), running: autoAdvance, cycleComplete: false };
-    }
-    // Fine break → torna a focus
-    return { phase: 'focus', sessionIndex: current.sessionIndex, secondsLeft: getDur('focus'), running: autoAdvance, cycleComplete: false };
-  }, []);
-
-useEffect(() => {
-    if (!timer.running) { stopInterval(); return; }
-    stopInterval();
-    intervalRef.current = setInterval(() => {
-      const current = timerRef.current;
-      if (current.secondsLeft <= 1) {
-        stopInterval();
-        playBell();
-        setTimer(computeNextState(current, true));
-        return;
-      }
-      setTimer(prev => ({ ...prev, secondsLeft: prev.secondsLeft - 1 }));
-    }, 1000);
-    return stopInterval;
-  }, [timer.running, timer.phase, computeNextState, stopInterval]);
-
+  // Bell quando il server segnala fine-fase naturale
+  const lastBellSignal = useRef(0);
   useEffect(() => {
-    if (!timerRef.current.running && !timerRef.current.cycleComplete)
-      setTimer(prev => ({ ...prev, secondsLeft: getDuration(prev.phase) }));
-  }, [pomodoroFocusMin, pomodoroShortBreakMin, pomodoroLongBreakMin]);
-
-  useEffect(() => stopInterval, [stopInterval]);
-
-  const handlePlayPause = () => {
-    if (timer.cycleComplete) {
-      setTimer({ phase: 'focus', sessionIndex: 0, secondsLeft: getDuration('focus'), running: true, cycleComplete: false });
-      return;
+    if (phaseCompleteSignal > lastBellSignal.current) {
+      lastBellSignal.current = phaseCompleteSignal;
+      playBell();
     }
-    setTimer(prev => ({ ...prev, running: !prev.running }));
-  };
-  const handleNext = () => { stopInterval(); setTimer(prev => computeNextState(prev)); };
-  const handleReset = () => { stopInterval(); setTimer({ phase: 'focus', sessionIndex: 0, secondsLeft: getDuration('focus'), running: false, cycleComplete: false }); };
+  }, [phaseCompleteSignal]);
 
-  const { phase, sessionIndex, secondsLeft, running, cycleComplete } = timer;
-  const totalSecs = getDuration(phase) || 1;
-  const progress = Math.max(0, Math.min(1, 1 - secondsLeft / totalSecs));
-  const mm = String(Math.floor(secondsLeft / 60)).padStart(2, '0');
-  const ss = String(secondsLeft % 60).padStart(2, '0');
+  // Tick locale — ricalcola il countdown da endsAt ogni secondo, nessun evento SSE necessario
+  const [, forceTick] = useState(0);
+  useEffect(() => {
+    if (status !== 'running') return;
+    const id = setInterval(() => forceTick(t => t + 1), 1000);
+    return () => clearInterval(id);
+  }, [status]);
+
+  const displaySecondsLeft = status === 'running' && endsAt
+    ? Math.max(0, Math.round((endsAt - Date.now()) / 1000))
+    : secondsLeft;
+
+  const running = status === 'running';
+  const cycleComplete = status === 'cycleComplete';
+
+  const totalSecs = (() => {
+    if (phase === 'focus') return config.pomodoroFocusMin * 60;
+    if (phase === 'shortBreak') return config.pomodoroShortBreakMin * 60;
+    return config.pomodoroLongBreakMin * 60;
+  })() || 1;
+
+  const progress = Math.max(0, Math.min(1, 1 - displaySecondsLeft / totalSecs));
+  const mm = String(Math.floor(displaySecondsLeft / 60)).padStart(2, '0');
+  const ss = String(displaySecondsLeft % 60).padStart(2, '0');
   const phaseLabel = phase === 'focus' ? t('pomodoro.focus') : phase === 'shortBreak' ? t('pomodoro.shortBreak') : t('pomodoro.longBreak');
   const sessionLabel = `${sessionIndex + 1} ${t('pomodoro.of')} ${pomodoroSessions}`;
-  const isResetDisabled = !running && secondsLeft === getDuration('focus') && sessionIndex === 0 && phase === 'focus' && !cycleComplete;
+  const isResetDisabled = status === 'idle' && phase === 'focus' && sessionIndex === 0;
+
+  const handlePlayPause = () => { running ? pause() : start(); };
 
   return (
     <div style={{
@@ -216,15 +182,12 @@ useEffect(() => {
       display: 'flex', flexDirection: 'row', alignItems: 'stretch',
       padding: '32px 40px', boxSizing: 'border-box',
     }}>
-
-      {/* ── Sinistra: titolo, tempo, pips, controlli ── */}
       <div style={{
         display: 'flex', flexDirection: 'column',
         justifyContent: 'space-between',
         width: '300px', flexShrink: 0,
         paddingRight: '32px',
       }}>
-        {/* Titolo + sessione */}
         <div>
           <h2 style={{
             fontSize: '44px', fontWeight: 700, textTransform: 'uppercase',
@@ -241,7 +204,6 @@ useEffect(() => {
           </p>
         </div>
 
-        {/* Tempo + pips */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
           <div style={{
             fontSize: '72px', fontWeight: 200, letterSpacing: '0.02em',
@@ -252,9 +214,8 @@ useEffect(() => {
           {!cycleComplete && <SessionPips total={pomodoroSessions} current={sessionIndex} />}
         </div>
 
-        {/* Controlli */}
         <div style={{ display: 'flex', gap: '16px', alignItems: 'center' }}>
-          <IconBtn onClick={handleReset} disabled={isResetDisabled}>
+          <IconBtn onClick={reset} disabled={isResetDisabled}>
             <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
               <rect x="2" y="2" width="12" height="12" fill="currentColor" />
             </svg>
@@ -271,7 +232,7 @@ useEffect(() => {
               </svg>
             )}
           </IconBtn>
-          <IconBtn onClick={handleNext} disabled={cycleComplete}>
+          <IconBtn onClick={skip} disabled={cycleComplete}>
             <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
               <polygon points="1,2 13,9 1,16" fill="currentColor" />
               <rect x="14" y="2" width="3" height="14" rx="1" fill="currentColor" />
@@ -280,7 +241,6 @@ useEffect(() => {
         </div>
       </div>
 
-      {/* ── Destra: visual grande, centrato verticalmente ── */}
       <div style={{
         flex: 1,
         display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -294,7 +254,6 @@ useEffect(() => {
           }
         </div>
       </div>
-
     </div>
   );
 };
