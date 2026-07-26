@@ -7,10 +7,16 @@ import { Trash2, Plus } from 'lucide-react';
 import { ThemedButton } from '@/components/ui-themed';
 
 const TodosPage = () => {
-  const { todos, fetchTodos, addTodo, toggleTodo, deleteTodo } = useTodoStore();
+  const { todos, fetchTodos, addTodo, toggleTodo, deleteTodo, initSse } = useTodoStore();
   const { t } = useTranslation();
   const [newTodo, setNewTodo] = useState('');
-  useEffect(() => { fetchTodos(); }, []);
+
+  useEffect(() => {
+    fetchTodos();
+    const cleanup = initSse();
+    return cleanup;
+  }, []);
+
   const handleAdd = () => { if (!newTodo.trim()) return; addTodo(newTodo); setNewTodo(''); };
   return (
     <div className="h-full p-8 flex flex-col select-none">

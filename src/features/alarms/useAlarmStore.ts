@@ -85,7 +85,7 @@ export const useAlarmStore = create<AlarmState>((set, get) => ({
     es.onmessage = (e) => {
       try {
         const msg = JSON.parse(e.data);
-        if (msg.type === 'alarm:triggered' || msg.type === 'alarm:skipped') {
+        if (msg.type === 'alarm:triggered' || msg.type === 'alarm:skipped' || msg.type === 'alarms:changed') {
           get().fetchAlarms();
         }
       } catch (_) {}

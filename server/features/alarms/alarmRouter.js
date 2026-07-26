@@ -6,6 +6,7 @@ import {
   addSseClient,
   stopAlarmAudio,
   emitAlarmStopped,
+  emitAlarmsChanged,
   snoozeAlarm,
 } from './alarmService.js';
 
@@ -18,7 +19,6 @@ alarmsRouter.get('/events', (req, res) => {
   res.setHeader('Connection', 'keep-alive');
   res.flushHeaders();
 
-  // Send a heartbeat every 25s to keep the connection alive through proxies
   const heartbeat = setInterval(() => res.write(': heartbeat\n\n'), 25000);
   res.on('close', () => clearInterval(heartbeat));
 
@@ -63,6 +63,7 @@ alarmsRouter.get('/', (req, res) => {
     res.json(alarms);
   } catch (e) { res.status(500).json({ error: 'Failed to fetch alarms' }); }
 });
+
 alarmsRouter.post('/', (req, res) => {
   try {
     const { time, label = '', enabled = true, days = [] } = req.body;
@@ -73,6 +74,7 @@ alarmsRouter.post('/', (req, res) => {
       .run(time, label, enabled ? 1 : 0, daysJson);
     const alarm = { id: result.lastInsertRowid, time, label, enabled: enabled ? 1 : 0, days, skip_next: 0 };
     rescheduleAlarm({ ...alarm, days: daysJson });
+    emitAlarmsChanged();
     res.status(201).json(alarm);
   } catch (e) { res.status(500).json({ error: 'Failed to create alarm' }); }
 });
@@ -84,6 +86,7 @@ alarmsRouter.post('/:id/skip-next', (req, res) => {
     if (!alarm) return res.status(404).json({ error: 'Alarm not found' });
     const newVal = alarm.skip_next ? 0 : 1;
     getDb().prepare('UPDATE alarms SET skip_next = ? WHERE id = ?').run(newVal, id);
+    emitAlarmsChanged();
     res.json({ skip_next: newVal === 1 });
   } catch (e) { res.status(500).json({ error: 'Failed to toggle skip_next' }); }
 });
@@ -97,6 +100,7 @@ alarmsRouter.put('/:id', (req, res) => {
       .run(time, label, enabled ? 1 : 0, daysJson, skip_next ? 1 : 0, req.params.id);
     const alarm = { id: Number(req.params.id), time, label, enabled: enabled ? 1 : 0, days, skip_next };
     rescheduleAlarm({ ...alarm, days: daysJson });
+    emitAlarmsChanged();
     res.json(alarm);
   } catch (e) { res.status(500).json({ error: 'Failed to update alarm' }); }
 });
@@ -106,6 +110,7 @@ alarmsRouter.delete('/:id', (req, res) => {
     const id = Number(req.params.id);
     cancelAlarm(id);
     getDb().prepare('DELETE FROM alarms WHERE id = ?').run(id);
+    emitAlarmsChanged();
     res.json({ ok: true });
   } catch (e) { res.status(500).json({ error: 'Failed to delete alarm' }); }
 });

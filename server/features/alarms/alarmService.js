@@ -32,6 +32,11 @@ export function emitAlarmSkipped(alarmId) {
   for (const res of sseClients) res.write(`data: ${data}\n\n`);
 }
 
+export function emitAlarmsChanged() {
+  const data = JSON.stringify({ type: 'alarms:changed' });
+  for (const res of sseClients) res.write(`data: ${data}\n\n`);
+}
+
 export function getCurrentTrackName() {
   return currentTrackName;
 }
