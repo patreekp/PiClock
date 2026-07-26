@@ -134,6 +134,20 @@ const translations = {
     'pomodoro.session': 'Session',
     'pomodoro.done': 'Cycle complete',
     'pomodoro.of': 'of',
+
+    // Remote
+    'remote.title': 'PiClock Remote',
+    'remote.nav.clock': 'Clock',
+    'remote.nav.weather': 'Weather',
+    'remote.nav.pomodoro': 'Pomodoro',
+    'remote.nav.todos': 'Todos',
+    'remote.nav.alarms': 'Alarms',
+    'remote.nav.settings': 'Settings',
+    'remote.noControls': 'No remote controls for this page yet.',
+    'remote.pomodoro.start': 'Start',
+    'remote.pomodoro.pause': 'Pause',
+    'remote.pomodoro.skip': 'Skip',
+    'remote.pomodoro.reset': 'Reset',
   },
   it: {
     // Clock
@@ -268,6 +282,20 @@ const translations = {
     'pomodoro.session': 'Sessione',
     'pomodoro.done': 'Ciclo completato',
     'pomodoro.of': 'di',
+
+    // Remote
+    'remote.title': 'Telecomando PiClock',
+    'remote.nav.clock': 'Orologio',
+    'remote.nav.weather': 'Meteo',
+    'remote.nav.pomodoro': 'Pomodoro',
+    'remote.nav.todos': 'Cose da fare',
+    'remote.nav.alarms': 'Sveglie',
+    'remote.nav.settings': 'Impostazioni',
+    'remote.noControls': 'Nessun comando disponibile per questa pagina.',
+    'remote.pomodoro.start': 'Avvia',
+    'remote.pomodoro.pause': 'Pausa',
+    'remote.pomodoro.skip': 'Salta',
+    'remote.pomodoro.reset': 'Reset',
   },
 } as const;
 

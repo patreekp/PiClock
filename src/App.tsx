@@ -6,6 +6,7 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import Index from "./pages/Index";
 import NotFound from "./pages/NotFound";
 import AlarmModal from "./features/alarms/AlarmModal";
+import RemoteApp from "./features/remote/RemoteApp";
 
 const queryClient = new QueryClient();
 
@@ -17,6 +18,7 @@ const App = () => (
       <BrowserRouter>
         <Routes>
           <Route path="/" element={<Index />} />
+          <Route path="/remote" element={<RemoteApp />} />
           <Route path="*" element={<NotFound />} />
         </Routes>
       </BrowserRouter>

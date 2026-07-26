@@ -33,7 +33,7 @@ npm --version
 > rm -rf node_modules package-lock.json
 > npm install --legacy-peer-deps
 > ```
- 
+ V
 ### System dependencies (Linux / Raspberry Pi only)
  
 ```bash

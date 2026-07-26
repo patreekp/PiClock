@@ -9,6 +9,7 @@ import { alarmsRouter } from './features/alarms/alarmRouter.js';
 import { configRouter } from './features/config/configRouter.js';
 import { audioRouter } from './features/audio/audioRouter.js';
 import { pomodoroRouter } from './features/pomodoro/pomodoroRouter.js';
+import { remoteRouter } from './features/remote/remoteRouter.js';
 import { initAlarmScheduler } from './features/alarms/alarmService.js';
 import { scanAudioLibrary } from './features/audio/audioLibraryService.js';
 import { getDb } from './db/database.js';
@@ -28,6 +29,7 @@ app.use('/api/alarms', alarmsRouter);
 app.use('/api/config', configRouter);
 app.use('/api/audio', audioRouter);
 app.use('/api/pomodoro', pomodoroRouter);
+app.use('/api/remote', remoteRouter);
 app.use('/api/system', systemRouter);
 
 initDb();

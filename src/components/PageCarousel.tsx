@@ -1,6 +1,6 @@
 import React, { useEffect, useCallback } from 'react';
 import { useSwipeable } from 'react-swipeable';
-import { useAppStore } from '../store/useAppStore';
+import { useAppStore, PageSlug } from '../store/useAppStore';
 import { usePomodoroStore } from '../store/usePomodoroStore';
 import ClockPage from '../features/clock/ClockPage';
 import WeatherPage from '../features/weather/WeatherPage';
@@ -9,13 +9,13 @@ import TodosPage from '../features/todos/TodosPage';
 import AlarmsPage from '../features/alarms/AlarmsPage';
 import SettingsPage from '../features/settings/SettingsPage';
 
-const PAGES = [
-  { label: 'Clock',    Component: ClockPage },
-  { label: 'Weather',  Component: WeatherPage },
-  { label: 'Pomodoro', Component: PomodoroPage },
-  { label: 'Todos',    Component: TodosPage },
-  { label: 'Alarms',   Component: AlarmsPage },
-  { label: 'Settings', Component: SettingsPage },
+const PAGES: { slug: PageSlug; label: string; Component: React.ComponentType }[] = [
+  { slug: 'clock',    label: 'Clock',    Component: ClockPage },
+  { slug: 'weather',  label: 'Weather',  Component: WeatherPage },
+  { slug: 'pomodoro', label: 'Pomodoro', Component: PomodoroPage },
+  { slug: 'todos',    label: 'Todos',    Component: TodosPage },
+  { slug: 'alarms',   label: 'Alarms',   Component: AlarmsPage },
+  { slug: 'settings', label: 'Settings', Component: SettingsPage },
 ];
 
 // ── Sunrise/sunset formula (NOAA simplified) ─────────────────────────────────
@@ -77,14 +77,17 @@ function isDaytime(lat: number, lon: number): boolean {
 // ─────────────────────────────────────────────────────────────────────────────
 
 const PageCarousel = () => {
-  const { currentPage, setPage, theme, fetchConfig, config } = useAppStore();
+  const { currentPage, setPage, theme, fetchConfig, config, connectRemote } = useAppStore();
 
   const navigateSignal = usePomodoroStore(s => s.navigateSignal);
   const connectPomodoro = usePomodoroStore(s => s.connect);
 
+  const activeIndex = PAGES.findIndex(p => p.slug === currentPage);
+  const safeIndex = activeIndex === -1 ? 0 : activeIndex;
+
   const handlers = useSwipeable({
-    onSwipedLeft:  () => setPage(Math.min(currentPage + 1, PAGES.length - 1)),
-    onSwipedRight: () => setPage(Math.max(currentPage - 1, 0)),
+    onSwipedLeft:  () => setPage(PAGES[Math.min(safeIndex + 1, PAGES.length - 1)].slug),
+    onSwipedRight: () => setPage(PAGES[Math.max(safeIndex - 1, 0)].slug),
     trackMouse: true,
     preventScrollOnSwipe: true,
   });
@@ -92,11 +95,11 @@ const PageCarousel = () => {
   useEffect(() => { fetchConfig(); }, []);
 
   useEffect(() => { connectPomodoro(); }, [connectPomodoro]);
+  useEffect(() => { connectRemote(); }, [connectRemote]);
 
   useEffect(() => {
     if (navigateSignal > 0) {
-      const idx = PAGES.findIndex(p => p.label === 'Pomodoro');
-      if (idx !== -1) setPage(idx);
+      setPage('pomodoro');
     }
   }, [navigateSignal]);
 
@@ -123,10 +126,10 @@ const PageCarousel = () => {
     <div {...handlers} className="h-screen w-screen overflow-hidden relative touch-none">
       <div
         className="flex h-full transition-transform duration-300 ease-out"
-        style={{ transform: `translateX(-${currentPage * 100}%)` }}
+        style={{ transform: `translateX(-${safeIndex * 100}%)` }}
       >
-        {PAGES.map(({ label, Component }) => (
-          <div key={label} className="w-screen h-full flex-shrink-0">
+        {PAGES.map(({ slug, Component }) => (
+          <div key={slug} className="w-screen h-full flex-shrink-0">
             <Component />
           </div>
         ))}
@@ -136,7 +139,7 @@ const PageCarousel = () => {
           <div
             key={i}
             className={`h-1.5 w-1.5 rounded-full transition-opacity duration-500 ${
-              i === currentPage ? 'bg-current opacity-100' : 'bg-current opacity-20'
+              i === safeIndex ? 'bg-current opacity-100' : 'bg-current opacity-20'
             }`}
           />
         ))}

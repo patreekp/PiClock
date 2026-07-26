@@ -4,9 +4,10 @@ export type ThemeMode = 'light' | 'dark' | 'auto';
 export type HighlightMode = 'off' | 'local' | 'audjust';
 export type Language = 'en' | 'it';
 export type PomodoroStyle = 'hourglass' | 'arc';
+export type PageSlug = 'clock' | 'weather' | 'pomodoro' | 'todos' | 'alarms' | 'settings';
 
 interface AppState {
-  currentPage: number;
+  currentPage: PageSlug;
   theme: ThemeMode;
   language: Language;
   notification: string;
@@ -22,7 +23,8 @@ interface AppState {
     pomodoroLongBreakMin: number;
     pomodoroSessions: number;
   };
-  setPage: (page: number) => void;
+  setPage: (page: PageSlug) => void;
+  connectRemote: () => void;
   setNotification: (msg: string, autoClearMs?: number) => void;
   fetchConfig: () => Promise<void>;
   updateConfig: (newConfig: Partial<AppState['config']>) => Promise<void>;
@@ -30,8 +32,10 @@ interface AppState {
   setLanguage: (language: Language) => Promise<void>;
 }
 
+let remoteSse: EventSource | null = null;
+
 export const useAppStore = create<AppState>((set, get) => ({
-  currentPage: 0, theme: 'light', language: 'en', notification: '',
+  currentPage: 'clock', theme: 'light', language: 'en', notification: '',
   config: {
     lat: '44.0594', lon: '12.5683', timezone: 'Europe/Rome',
     clock24h: true, showSeconds: false,
@@ -43,7 +47,32 @@ export const useAppStore = create<AppState>((set, get) => ({
     pomodoroLongBreakMin: 15,
     pomodoroSessions: 4,
   },
-  setPage: (page) => set({ currentPage: page }),
+  setPage: (page) => {
+    set({ currentPage: page });
+    fetch('/api/remote/navigate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ page }),
+    }).catch(e => console.error('Failed to notify remote navigate', e));
+  },
+  connectRemote: () => {
+    if (remoteSse) return; // singleton — una sola connessione per tutta l'app
+
+    // stato iniziale (nel caso il client si connetta a metà sessione)
+    fetch('/api/remote/state')
+      .then(res => res.json())
+      .then(data => { if (data.page) set({ currentPage: data.page }); })
+      .catch(e => console.error('Failed to fetch remote state', e));
+
+    remoteSse = new EventSource('/api/remote/events');
+    remoteSse.addEventListener('remote:navigate', (e) => {
+      const data = JSON.parse((e as MessageEvent).data);
+      // set diretto, NON tramite setPage: evita di ri-notificare il server
+      // (che rimanderebbe di nuovo l'evento a tutti, incluso il mittente)
+      if (data.page) set({ currentPage: data.page });
+    });
+    remoteSse.onerror = () => { /* EventSource riprova la connessione da solo */ };
+  },
   setNotification: (msg, autoClearMs) => {
     set({ notification: msg });
     if (autoClearMs) setTimeout(() => { if (get().notification === msg) set({ notification: '' }); }, autoClearMs);
