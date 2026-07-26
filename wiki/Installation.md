@@ -7,15 +7,32 @@ Complete setup instructions for PiClock — from clone to running, on both a dev
 ## Requirements
  
 ### Node.js
- 
-- **Node.js** v18 or higher
+
+- **Node.js** v20 or higher (v22 LTS recommended — some dependencies, including Vite 8 and better-sqlite3's native build, require it)
 - **npm** v9 or higher
-Check your versions:
- 
+
+The project pins its recommended version in `.nvmrc`. If you use [nvm](https://github.com/nvm-sh/nvm):
+
+```bash
+# install nvm (skip if already installed)
+curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.1/install.sh | bash
+# restart your terminal, then:
+nvm install
+nvm use
+```
+
+Otherwise, check your versions manually:
+
 ```bash
 node --version
 npm --version
 ```
+
+> **Node 18 will not work correctly.** `npm install` will succeed but emit `EBADENGINE` warnings, and `better-sqlite3`'s native binding may be compiled against the wrong ABI, causing runtime errors when the server starts. If you're upgrading an existing checkout from Node 18, delete and rebuild native modules after switching:
+> ```bash
+> rm -rf node_modules package-lock.json
+> npm install --legacy-peer-deps
+> ```
  
 ### System dependencies (Linux / Raspberry Pi only)
  
@@ -51,6 +68,14 @@ npm install
 ```
  
 This generates the `node_modules` folder locally. It takes a minute on a Raspberry Pi — be patient.
+
+> On first install (or after switching Node versions), `better-sqlite3` compiles a native binding from source — this can take several minutes, longer than a typical `npm install`. This is expected.
+ 
+> **Peer dependency conflict:** `vaul` (used by shadcn/ui for drawers/bottom-sheets) declares support for React ≤18 only, while this project uses React 19. If `npm install` fails with an `ERESOLVE` error mentioning `vaul`, run instead:
+> ```bash
+> npm install --legacy-peer-deps
+> ```
+> This is expected and safe — React 19 is simply newer than what `vaul`'s peer dependency range has been updated to reflect, but it works fine in practice. If you run this, commit the updated `package-lock.json` so future installs (including on the Pi) don't hit the same error.
  
 ### 3. Prepare an audio folder
  
@@ -267,17 +292,23 @@ piclock/
 │       ├── todos/todoRouter.js
 │       ├── alarms/alarmRouter.js + alarmService.js
 │       ├── audio/audioRouter.js + audioLibraryService.js
+│       ├── pomodoro/pomodoroRouter.js + pomodoroService.js
 │       ├── config/configRouter.js
 │       └── system/systemRouter.js
 ├── src/
 │   ├── App.tsx
-│   ├── store/useAppStore.ts              # Global Zustand store
+│   ├── store/
+│   │   ├── useAppStore.ts               # Global Zustand store (config, theme, language)
+│   │   └── usePomodoroStore.ts          # Pomodoro timer state, SSE connection, remote actions
 │   ├── components/
-│   │   ├── PageCarousel.tsx             # Swipe navigation + auto theme logic
+│   │   ├── PageCarousel.tsx             # Swipe navigation + auto theme + remote-navigate listener
 │   │   └── ui-themed.tsx               # ThemedButton, ThemedSwitch, ThemedToggleGroup
+│   ├── assets/
+│   │   └── sounds/bell.mp3              # Pomodoro phase-complete sound
 │   └── features/
 │       ├── clock/ClockPage.tsx
 │       ├── weather/WeatherPage.tsx
+│       ├── pomodoro/PomodoroPage.tsx
 │       ├── todos/TodosPage.tsx
 │       ├── alarms/AlarmsPage.tsx + AlarmModal.tsx
 │       └── settings/SettingsPage.tsx
@@ -334,6 +365,19 @@ piclock/
 | `POST` | `/api/audio/scan/stop` | Cancel an in-progress scan |
 | `GET` | `/api/audio/events` | SSE stream — scan progress and errors |
  
+### Pomodoro
+ 
+Timer state lives on the backend (in memory, not persisted), so it can be controlled from any device on the local network — not just the Pi's own touchscreen.
+ 
+| Method | Endpoint | Description |
+|---|---|---|
+| `GET` | `/api/pomodoro/state` | Current timer state (phase, session index, status, seconds left) |
+| `POST` | `/api/pomodoro/start` | Start or resume the timer; also triggers `pomodoro:navigate` |
+| `POST` | `/api/pomodoro/pause` | Pause the running timer |
+| `POST` | `/api/pomodoro/reset` | Reset to the beginning of the cycle |
+| `POST` | `/api/pomodoro/skip` | Manually skip to the next phase (no auto-resume) |
+| `GET` | `/api/pomodoro/events` | SSE stream — `pomodoro:state`, `pomodoro:phase-complete`, `pomodoro:navigate` |
+ 
 ---
  
 ## Architecture notes
@@ -342,12 +386,17 @@ piclock/
  
 **UI components** — Always use the components in `ui-themed.tsx` (`ThemedSwitch`, `ThemedToggleGroup`, `ThemedButton`) for interactive controls. Do not use raw shadcn/ui components for these — they will not follow the theme correctly.
  
-**SSE streams** — The app uses two separate SSE endpoints: `/api/alarms/events` for alarm triggers, and `/api/audio/events` for library scan progress. Both are consumed by the frontend and kept alive with a 25-second heartbeat.
+**SSE streams** — The app uses three separate SSE endpoints: `/api/alarms/events` for alarm triggers, `/api/audio/events` for library scan progress, and `/api/pomodoro/events` for timer state. All three are consumed by the frontend and kept alive with a 25-second heartbeat.
  
 **Song Highlights** — When enabled (`Local` mode), ffmpeg analyzes each audio file using ebur128 loudness measurement and stores the top-3 peak timestamps in SQLite. The first alarm play of the day starts from the loudest moment; subsequent plays start from the beginning. Requires `ffmpeg` to be installed on the system.
  
 **Auto theme** — `PageCarousel` recalculates sunrise/sunset every minute using the NOAA solar formula with the configured latitude/longitude. No external API call is made for this.
  
+**Pomodoro / remote control pattern** — The Pomodoro timer's state (phase, session index, running/paused, time remaining) lives on the server, not in the browser tab, using an in-memory state machine (`pomodoroService.js`) rather than SQLite — a running timer is meant to be ephemeral, so a server restart intentionally resets it rather than resuming a stale countdown. Any device that can reach `/api/pomodoro/*` (the Pi itself, or a phone on the same LAN) can start/pause/reset/skip the timer; every connected client is notified via SSE (`pomodoro:state`) and recomputes the countdown locally from a shared `endsAt` timestamp, so no per-second SSE traffic is needed. Starting the timer also emits `pomodoro:navigate`, which `PageCarousel` listens for to automatically switch the Pi's display to the Pomodoro page. This REST-endpoint-mutates-server-state + SSE-broadcasts-to-all-clients pattern is the intended foundation for a more generic remote-control feature (e.g. arbitrary page navigation from a second device), planned but not yet implemented.
+ 
 **node_modules on Pi** — Always run `npm install` directly on the Raspberry Pi after transferring files. Some native Node.js packages (like `better-sqlite3`) must be compiled for the target architecture.
  
 **Network binding** — In production the server binds to `0.0.0.0` (not `localhost`) so it's reachable from any device on the LAN, and defaults to port `80` (via `setcap`, see deployment section) so the app is reachable at a clean `http://piclock.local` with no port in the URL.
+ 
+**tsconfig.json** — Do not use the `baseUrl` compiler option; it has been removed and is rejected by recent TypeScript versions when `moduleResolution` is set to `"bundler"`. Path aliases (`"@/*": ["./src/*"]`) resolve automatically relative to the location of `tsconfig.json` without it.
+ 
