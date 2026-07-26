@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { onSseEvent } from '../lib/sseHub';
 
 type Phase = 'focus' | 'shortBreak' | 'longBreak';
 type Status = 'idle' | 'running' | 'paused' | 'cycleComplete';
@@ -9,8 +10,8 @@ interface PomodoroStoreState {
   status: Status;
   secondsLeft: number;
   endsAt: number | null;
-  navigateSignal: number;      // incrementato ad ogni richiesta di navigazione remota
-  phaseCompleteSignal: number; // incrementato ad ogni fine-fase naturale (per il bell)
+  navigateSignal: number;
+  phaseCompleteSignal: number;
   connect: () => void;
   start: () => Promise<void>;
   pause: () => Promise<void>;
@@ -18,27 +19,28 @@ interface PomodoroStoreState {
   skip: () => Promise<void>;
 }
 
-let sse: EventSource | null = null;
+let connected = false;
 
 export const usePomodoroStore = create<PomodoroStoreState>((set, get) => ({
   phase: 'focus', sessionIndex: 0, status: 'idle', secondsLeft: 25 * 60, endsAt: null,
   navigateSignal: 0, phaseCompleteSignal: 0,
 
   connect: () => {
-    if (sse) return; // singleton — una sola connessione per tutta l'app
-    sse = new EventSource('/api/pomodoro/events');
+    if (connected) return;
+    connected = true;
 
-    sse.addEventListener('pomodoro:state', (e) => {
-      const data = JSON.parse((e as MessageEvent).data);
-      set({ ...data });
-    });
-    sse.addEventListener('pomodoro:phase-complete', () => {
+    fetch('/api/pomodoro/state')
+      .then(res => res.json())
+      .then(data => set({ ...data }))
+      .catch(e => console.error('Failed to fetch pomodoro state', e));
+
+    onSseEvent('pomodoro:state', (data) => set({ ...data }));
+    onSseEvent('pomodoro:phase-complete', () => {
       set(s => ({ phaseCompleteSignal: s.phaseCompleteSignal + 1 }));
     });
-    sse.addEventListener('pomodoro:navigate', () => {
+    onSseEvent('pomodoro:navigate', () => {
       set(s => ({ navigateSignal: s.navigateSignal + 1 }));
     });
-    sse.onerror = () => { /* EventSource riprova la connessione da solo */ };
   },
 
   start: async () => { await fetch('/api/pomodoro/start', { method: 'POST' }); },

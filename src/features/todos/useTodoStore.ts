@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { onSseEvent } from '../../lib/sseHub';
 
 interface Todo {
   id: number;
@@ -37,20 +38,13 @@ export const useTodoStore = create<TodoState>((set, get) => ({
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ text, done: !done }),
     });
-    set({
-      todos: get().todos.map(t => t.id === id ? { ...t, done: done ? 0 : 1 } : t)
-    });
+    set({ todos: get().todos.map(t => t.id === id ? { ...t, done: done ? 0 : 1 } : t) });
   },
   deleteTodo: async (id) => {
     await fetch(`/api/todos/${id}`, { method: 'DELETE' });
     set({ todos: get().todos.filter(t => t.id !== id) });
   },
   initSse: () => {
-    const es = new EventSource('/api/todos/events');
-    es.addEventListener('todos:changed', () => {
-      get().fetchTodos();
-    });
-    es.onerror = () => { /* EventSource riprova la connessione da solo */ };
-    return () => es.close();
+    return onSseEvent('todos:changed', () => { get().fetchTodos(); });
   },
 }));

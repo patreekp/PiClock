@@ -1,19 +1,7 @@
 import { Router } from 'express';
-import { getState, start, pause, reset, skip, addSseClient } from './pomodoroService.js';
+import { getState, start, pause, reset, skip } from './pomodoroService.js';
 
 export const pomodoroRouter = Router();
-
-pomodoroRouter.get('/events', (req, res) => {
-  res.setHeader('Content-Type', 'text/event-stream');
-  res.setHeader('Cache-Control', 'no-cache');
-  res.setHeader('Connection', 'keep-alive');
-  res.flushHeaders();
-
-  const heartbeat = setInterval(() => res.write(': heartbeat\n\n'), 25000);
-  res.on('close', () => clearInterval(heartbeat));
-
-  addSseClient(res);
-});
 
 pomodoroRouter.get('/state', (req, res) => res.json(getState()));
 

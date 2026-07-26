@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { fetchWeather } from './weatherService.js';
+import { broadcast } from '../../sse.js';
 
 export const weatherRouter = Router();
 
@@ -7,12 +8,6 @@ export const weatherRouter = Router();
 let cache = null;
 let cacheTime = 0;
 const CACHE_TTL_MS = 10 * 60 * 1000; // 10 minutes
-let sseClients = [];
-
-function broadcast(event, data) {
-  const payload = `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`;
-  sseClients.forEach(res => res.write(payload));
-}
 
 // GET /api/weather
 weatherRouter.get('/', async (req, res) => {
@@ -26,7 +21,6 @@ weatherRouter.get('/', async (req, res) => {
     res.json(cache);
   } catch (e) {
     console.error('GET /api/weather error:', e);
-    // Return stale cache if available rather than an error
     if (cache) return res.json(cache);
     res.status(503).json({ error: 'Weather unavailable' });
   }
@@ -45,20 +39,4 @@ weatherRouter.post('/refresh', async (req, res) => {
     broadcast('weather:error', { message: e.message });
     res.status(503).json({ error: 'Weather refresh failed' });
   }
-});
-
-// GET /api/weather/events — SSE, stesso pattern di pomodoro/remote
-weatherRouter.get('/events', (req, res) => {
-  res.setHeader('Content-Type', 'text/event-stream');
-  res.setHeader('Cache-Control', 'no-cache');
-  res.setHeader('Connection', 'keep-alive');
-  res.flushHeaders();
-
-  const heartbeat = setInterval(() => res.write(': heartbeat\n\n'), 25000);
-  res.on('close', () => clearInterval(heartbeat));
-
-  sseClients.push(res);
-  // stato immediato al nuovo client, se già disponibile in cache
-  if (cache) res.write(`event: weather:updated\ndata: ${JSON.stringify(cache)}\n\n`);
-  res.on('close', () => { sseClients = sseClients.filter(c => c !== res); });
 });

@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { onSseEvent } from '../../lib/sseHub';
 
 export interface Alarm {
   id: number;
@@ -81,15 +82,9 @@ export const useAlarmStore = create<AlarmState>((set, get) => ({
   },
 
   initSse: () => {
-    const es = new EventSource('/api/alarms/events');
-    es.onmessage = (e) => {
-      try {
-        const msg = JSON.parse(e.data);
-        if (msg.type === 'alarm:triggered' || msg.type === 'alarm:skipped' || msg.type === 'alarms:changed') {
-          get().fetchAlarms();
-        }
-      } catch (_) {}
-    };
-    return () => es.close();
+    const unsubTriggered = onSseEvent('alarm:triggered', () => get().fetchAlarms());
+    const unsubSkipped = onSseEvent('alarm:skipped', () => get().fetchAlarms());
+    const unsubChanged = onSseEvent('alarms:changed', () => get().fetchAlarms());
+    return () => { unsubTriggered(); unsubSkipped(); unsubChanged(); };
   },
 }));

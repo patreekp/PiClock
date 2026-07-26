@@ -1,6 +1,7 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Bell, X, AlarmClock } from 'lucide-react';
 import { useAppStore } from '../../store/useAppStore';
+import { onSseEvent } from '../../lib/sseHub';
 
 interface ActiveAlarm {
   id: number;
@@ -9,39 +10,28 @@ interface ActiveAlarm {
   trackName?: string;
 }
 
-// WeatherPage è la pagina index 1 nel carousel (Clock=0, Weather=1, ...)
-// Adatta il numero se nel tuo carousel l'ordine è diverso
-const CLOCK_PAGE_INDEX = 0; 
-const WEATHER_PAGE_INDEX = 1;
-
 const AlarmModal = () => {
   const [activeAlarm, setActiveAlarm] = useState<ActiveAlarm | null>(null);
   const { config, setPage } = useAppStore();
   const snoozeMinutes = config.snoozeMinutes;
 
   useEffect(() => {
-    const es = new EventSource('/api/alarms/events');
-    es.onmessage = (e) => {
-      try {
-        const msg = JSON.parse(e.data);
-        if (msg.type === 'alarm:triggered') setActiveAlarm(msg.alarm);
-        else if (msg.type === 'alarm:stopped') setActiveAlarm(null);
-      } catch (_) {}
-    };
-    return () => es.close();
+    const unsubTriggered = onSseEvent('alarm:triggered', (alarm) => setActiveAlarm(alarm));
+    const unsubStopped = onSseEvent('alarm:stopped', () => setActiveAlarm(null));
+    return () => { unsubTriggered(); unsubStopped(); };
   }, []);
 
   const handleStop = async () => {
     if (!activeAlarm) return;
     try { await fetch(`/api/alarms/${activeAlarm.id}/stop`, { method: 'POST' }); } catch (_) {}
     setActiveAlarm(null);
-    
-    // Cambia alla pagina del meteo immediatamente
-    setPage(WEATHER_PAGE_INDEX);
 
-    // Dopo un minuto, cambia alla pagina dell'ora
+    // Cambia alla pagina del meteo immediatamente
+    setPage('weather');
+
+    // Dopo un minuto, torna alla pagina dell'orologio
     setTimeout(() => {
-      setPage(CLOCK_PAGE_INDEX); // Supponiamo che CLOCK_PAGE_INDEX sia l'indice della pagina dell'ora
+      setPage('clock');
     }, 60000); // 60000 millisecondi = 1 minuto
   };
 
@@ -71,7 +61,6 @@ const AlarmModal = () => {
         <div className="text-sm uppercase tracking-[0.3em] opacity-50 font-bold">
           {activeAlarm.label || 'Sveglia'}
         </div>
-        {/* Nome brano */}
         {activeAlarm.trackName && (
           <div
             className="text-xs tracking-widest"
@@ -84,7 +73,6 @@ const AlarmModal = () => {
 
       {/* Bottom buttons */}
       <div className="flex-shrink-0 flex" style={{ borderTop: '1px solid var(--color-fg)' }}>
-        {/* Snooze */}
         <button
           onClick={handleSnooze}
           className="flex-1 flex flex-col items-center justify-center gap-2 py-8 hover:opacity-70 transition-opacity active:opacity-50"
@@ -95,7 +83,6 @@ const AlarmModal = () => {
           <span className="text-xs opacity-50 uppercase tracking-widest">+{snoozeMinutes} min</span>
         </button>
 
-        {/* Stop */}
         <button
           onClick={handleStop}
           className="flex-1 flex flex-col items-center justify-center gap-2 py-8 hover:opacity-90 transition-opacity active:opacity-75"

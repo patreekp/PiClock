@@ -3,7 +3,6 @@ import { getDb } from '../../db/database.js';
 import {
   rescheduleAlarm,
   cancelAlarm,
-  addSseClient,
   stopAlarmAudio,
   emitAlarmStopped,
   emitAlarmsChanged,
@@ -11,19 +10,6 @@ import {
 } from './alarmService.js';
 
 export const alarmsRouter = Router();
-
-// ── SSE endpoint ──────────────────────────────────────────────────────────────
-alarmsRouter.get('/events', (req, res) => {
-  res.setHeader('Content-Type', 'text/event-stream');
-  res.setHeader('Cache-Control', 'no-cache');
-  res.setHeader('Connection', 'keep-alive');
-  res.flushHeaders();
-
-  const heartbeat = setInterval(() => res.write(': heartbeat\n\n'), 25000);
-  res.on('close', () => clearInterval(heartbeat));
-
-  addSseClient(res);
-});
 
 // ── Stop active alarm ─────────────────────────────────────────────────────────
 alarmsRouter.post('/:id/stop', (req, res) => {
@@ -42,7 +28,7 @@ alarmsRouter.post('/:id/snooze', (req, res) => {
     const alarm = getDb().prepare('SELECT * FROM alarms WHERE id = ?').get(req.params.id);
     if (!alarm) return res.status(404).json({ error: 'Alarm not found' });
     snoozeAlarm(alarm);
-    emitAlarmStopped(); // close the modal on the frontend
+    emitAlarmStopped();
     res.json({ ok: true });
   } catch (e) {
     res.status(500).json({ error: 'Failed to snooze alarm' });

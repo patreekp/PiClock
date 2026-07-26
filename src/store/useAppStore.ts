@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { onSseEvent } from '../lib/sseHub';
 
 export type ThemeMode = 'light' | 'dark' | 'auto';
 export type HighlightMode = 'off' | 'local' | 'audjust';
@@ -32,7 +33,7 @@ interface AppState {
   setLanguage: (language: Language) => Promise<void>;
 }
 
-let remoteSse: EventSource | null = null;
+let remoteConnected = false;
 
 export const useAppStore = create<AppState>((set, get) => ({
   currentPage: 'clock', theme: 'light', language: 'en', notification: '',
@@ -56,22 +57,17 @@ export const useAppStore = create<AppState>((set, get) => ({
     }).catch(e => console.error('Failed to notify remote navigate', e));
   },
   connectRemote: () => {
-    if (remoteSse) return; // singleton — una sola connessione per tutta l'app
+    if (remoteConnected) return;
+    remoteConnected = true;
 
-    // stato iniziale (nel caso il client si connetta a metà sessione)
     fetch('/api/remote/state')
       .then(res => res.json())
       .then(data => { if (data.page) set({ currentPage: data.page }); })
       .catch(e => console.error('Failed to fetch remote state', e));
 
-    remoteSse = new EventSource('/api/remote/events');
-    remoteSse.addEventListener('remote:navigate', (e) => {
-      const data = JSON.parse((e as MessageEvent).data);
-      // set diretto, NON tramite setPage: evita di ri-notificare il server
-      // (che rimanderebbe di nuovo l'evento a tutti, incluso il mittente)
+    onSseEvent('remote:navigate', (data) => {
       if (data.page) set({ currentPage: data.page });
     });
-    remoteSse.onerror = () => { /* EventSource riprova la connessione da solo */ };
   },
   setNotification: (msg, autoClearMs) => {
     set({ notification: msg });

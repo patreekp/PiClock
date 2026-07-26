@@ -1,28 +1,8 @@
 import { Router } from 'express';
 import { getDb } from '../../db/database.js';
+import { broadcast } from '../../sse.js';
 
 export const todosRouter = Router();
-
-// ── SSE ─────────────────────────────────────────────────────────────────────
-let sseClients = [];
-
-function broadcastTodosChanged() {
-  const payload = `event: todos:changed\ndata: {}\n\n`;
-  sseClients.forEach(res => res.write(payload));
-}
-
-todosRouter.get('/events', (req, res) => {
-  res.setHeader('Content-Type', 'text/event-stream');
-  res.setHeader('Cache-Control', 'no-cache');
-  res.setHeader('Connection', 'keep-alive');
-  res.flushHeaders();
-
-  const heartbeat = setInterval(() => res.write(': heartbeat\n\n'), 25000);
-  res.on('close', () => clearInterval(heartbeat));
-
-  sseClients.push(res);
-  res.on('close', () => { sseClients = sseClients.filter(c => c !== res); });
-});
 
 // GET /api/todos — newest first
 todosRouter.get('/', (req, res) => {
@@ -47,7 +27,7 @@ todosRouter.post('/', (req, res) => {
       .prepare('INSERT INTO todos (text, done) VALUES (?, 0)')
       .run(text.trim());
 
-    broadcastTodosChanged();
+    broadcast('todos:changed', {});
     res.status(201).json({ id: result.lastInsertRowid, text: text.trim(), done: 0 });
   } catch (e) {
     console.error('POST /api/todos error:', e);
@@ -63,7 +43,7 @@ todosRouter.put('/:id', (req, res) => {
     getDb()
       .prepare('UPDATE todos SET text = ?, done = ? WHERE id = ?')
       .run(text, done ? 1 : 0, id);
-    broadcastTodosChanged();
+    broadcast('todos:changed', {});
     res.json({ ok: true });
   } catch (e) {
     console.error('PUT /api/todos error:', e);
@@ -75,7 +55,7 @@ todosRouter.put('/:id', (req, res) => {
 todosRouter.delete('/:id', (req, res) => {
   try {
     getDb().prepare('DELETE FROM todos WHERE id = ?').run(req.params.id);
-    broadcastTodosChanged();
+    broadcast('todos:changed', {});
     res.json({ ok: true });
   } catch (e) {
     console.error('DELETE /api/todos error:', e);

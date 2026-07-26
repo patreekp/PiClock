@@ -2,6 +2,7 @@ import express from 'express';
 import { fileURLToPath } from 'url';
 import path from 'path';
 import { initDb } from './db/database.js';
+import { sseHandler } from './sse.js';
 import { clockRouter } from './features/clock/clockRouter.js';
 import { weatherRouter } from './features/weather/weatherRouter.js';
 import { todosRouter } from './features/todos/todoRouter.js';
@@ -22,6 +23,7 @@ const PORT = process.env.PORT || 80;
 const HOST = '0.0.0.0'; // ascolta su tutte le interfacce, non solo localhost
 
 app.use(express.json());
+app.get('/api/events', sseHandler);
 app.use('/api/clock', clockRouter);
 app.use('/api/weather', weatherRouter);
 app.use('/api/todos', todosRouter);

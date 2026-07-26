@@ -4,37 +4,28 @@ import path from 'path';
 import fs from 'fs';
 import { getDb } from '../../db/database.js';
 import { pickAlarmTrack } from '../audio/audioLibraryService.js';
+import { broadcast } from '../../sse.js';
 
 const activeJobs = new Map();
-const sseClients = new Set();
 let currentAudioProc = null;
 let audioLoopActive = false;
 let currentTrackName = null;
 
-// ── SSE client registry ───────────────────────────────────────────────────────
-export function addSseClient(res) {
-  sseClients.add(res);
-  res.on('close', () => sseClients.delete(res));
-}
-
+// ── Eventi (broadcast via hub SSE condiviso) ──────────────────────────────────
 function emitAlarmTriggered(alarm) {
-  const data = JSON.stringify({ type: 'alarm:triggered', alarm });
-  for (const res of sseClients) res.write(`data: ${data}\n\n`);
+  broadcast('alarm:triggered', alarm);
 }
 
 export function emitAlarmStopped() {
-  const data = JSON.stringify({ type: 'alarm:stopped' });
-  for (const res of sseClients) res.write(`data: ${data}\n\n`);
+  broadcast('alarm:stopped', {});
 }
 
 export function emitAlarmSkipped(alarmId) {
-  const data = JSON.stringify({ type: 'alarm:skipped', alarmId });
-  for (const res of sseClients) res.write(`data: ${data}\n\n`);
+  broadcast('alarm:skipped', { alarmId });
 }
 
 export function emitAlarmsChanged() {
-  const data = JSON.stringify({ type: 'alarms:changed' });
-  for (const res of sseClients) res.write(`data: ${data}\n\n`);
+  broadcast('alarms:changed', {});
 }
 
 export function getCurrentTrackName() {
@@ -241,7 +232,6 @@ function scheduleAlarm(alarm) {
 
   const [hour, minute] = alarm.time.split(':').map(Number);
 
-  // days: array JS di interi 0-6 (0=Dom). Vuoto = ogni giorno.
   let days = [];
   try { days = JSON.parse(alarm.days || '[]'); } catch (_) {}
   const dayExpr = days.length > 0 ? days.join(',') : '*';
@@ -249,7 +239,6 @@ function scheduleAlarm(alarm) {
   const job = schedule.scheduleJob(`${minute} ${hour} * * ${dayExpr}`, () => {
     console.log(`[Alarm] ⏰ Triggered: [${alarm.id}] "${alarm.label}" alle ${alarm.time}`);
 
-    // Controlla skip_next — rilegge dal DB per avere il valore aggiornato
     const row = getDb().prepare('SELECT skip_next FROM alarms WHERE id = ?').get(alarm.id);
     if (row?.skip_next) {
       getDb().prepare('UPDATE alarms SET skip_next = 0 WHERE id = ?').run(alarm.id);

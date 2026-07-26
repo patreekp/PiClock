@@ -1,9 +1,9 @@
 import { getDb } from '../../db/database.js';
+import { broadcast } from '../../sse.js'; 
 
 // ── Stato in memoria — non persistito: un pomodoro è effimero per natura ──────
 let state = null;
 let phaseTimeout = null;
-let sseClients = [];
 
 function readDurations() {
   const rows = getDb()
@@ -117,17 +117,4 @@ export function skip() {
     state = { phase: 'focus', sessionIndex: state.sessionIndex, status: 'idle', secondsLeft: d.focus, endsAt: null };
   }
   broadcast('pomodoro:state', getState());
-}
-
-// ── SSE ─────────────────────────────────────────────────────────────────────
-function broadcast(event, data) {
-  const payload = `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`;
-  sseClients.forEach(res => res.write(payload));
-}
-
-export function addSseClient(res) {
-  sseClients.push(res);
-  // stato immediato al nuovo client (Pi o telefono che apre la pagina)
-  res.write(`event: pomodoro:state\ndata: ${JSON.stringify(getState())}\n\n`);
-  res.on('close', () => { sseClients = sseClients.filter(c => c !== res); });
 }
