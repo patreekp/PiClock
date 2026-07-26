@@ -148,6 +148,8 @@ const translations = {
     'remote.pomodoro.pause': 'Pause',
     'remote.pomodoro.skip': 'Skip',
     'remote.pomodoro.reset': 'Reset',
+    'remote.weather.refresh': 'Refresh',
+    'remote.weather.refreshing': 'Refreshing...',
   },
   it: {
     // Clock
@@ -296,6 +298,8 @@ const translations = {
     'remote.pomodoro.pause': 'Pausa',
     'remote.pomodoro.skip': 'Salta',
     'remote.pomodoro.reset': 'Reset',
+    'remote.weather.refresh': 'Aggiorna',
+    'remote.weather.refreshing': 'Aggiornamento...',
   },
 } as const;
 

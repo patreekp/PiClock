@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import { useAppStore, PageSlug } from '../../store/useAppStore';
 import { usePomodoroStore } from '../../store/usePomodoroStore';
+import { useWeatherStore } from '../weather/useWeatherStore';
 import { useTranslation } from '../../i18n/useTranslation';
 import { ThemedButton } from '../../components/ui-themed';
 import type { TranslationKey } from '../../i18n/translations';
@@ -35,8 +36,13 @@ const RemoteApp = () => {
   const resetPomodoro = usePomodoroStore(s => s.reset);
   const skipPomodoro = usePomodoroStore(s => s.skip);
 
+  const weatherLoading = useWeatherStore(s => s.loading);
+  const connectWeather = useWeatherStore(s => s.connect);
+  const refreshWeather = useWeatherStore(s => s.refresh);
+
   useEffect(() => { connectRemote(); }, [connectRemote]);
   useEffect(() => { connectPomodoro(); }, [connectPomodoro]);
+  useEffect(() => { connectWeather(); }, [connectWeather]);
 
   return (
     <div
@@ -110,7 +116,20 @@ const RemoteApp = () => {
           </div>
         )}
 
-        {currentPage !== 'pomodoro' && (
+        {currentPage === 'weather' && (
+          <div className="flex flex-col gap-4">
+            <ThemedButton
+              variant="solid"
+              onClick={() => refreshWeather()}
+              disabled={weatherLoading}
+              className="py-4 rounded-lg w-full"
+            >
+              {weatherLoading ? t('remote.weather.refreshing') : t('remote.weather.refresh')}
+            </ThemedButton>
+          </div>
+        )}
+
+        {currentPage !== 'pomodoro' && currentPage !== 'weather' && (
           <p className="text-center text-sm opacity-50 mt-8">
             {t('remote.noControls')}
           </p>

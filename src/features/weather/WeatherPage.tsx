@@ -4,15 +4,16 @@ import { useTranslation } from '../../i18n/useTranslation';
 import { Wind, Droplets, ArrowDown, ArrowUp } from 'lucide-react';
 
 const WeatherPage = () => {
-  const { weather, loading, fetchWeather } = useWeatherStore();
+  const { weather, loading, fetchWeather, connect } = useWeatherStore();
   const { t, language } = useTranslation();
 
   useEffect(() => {
     fetchWeather();
+    connect();
     const interval = setInterval(fetchWeather, 30 * 60 * 1000);
     return () => clearInterval(interval);
   }, []);
-
+  
   if (loading && !weather) return (
     <div className="h-full flex items-center justify-center uppercase tracking-widest opacity-40" style={{ fontSize: '2.5vw' }}>
       {t('weather.loading')}
