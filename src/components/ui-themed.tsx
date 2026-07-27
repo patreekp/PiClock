@@ -130,3 +130,81 @@ export const ThemedButton = ({
     </button>
   );
 };
+
+// ── ThemedSlider ──────────────────────────────────────────────────────────────
+// Slider touch-friendly (volume/luminosità) — Pointer Events, nessuna dipendenza esterna.
+// onChange: aggiornamento locale continuo durante il drag.
+// onChangeEnd: fired al rilascio, usalo per persistere su config (evita spam di PUT).
+interface ThemedSliderProps {
+  value: number;
+  min: number;
+  max: number;
+  step?: number;
+  onChange: (val: number) => void;
+  onChangeEnd?: (val: number) => void;
+  className?: string;
+}
+
+export const ThemedSlider = ({
+  value, min, max, step = 1, onChange, onChangeEnd, className,
+}: ThemedSliderProps) => {
+  const trackRef = React.useRef<HTMLDivElement>(null);
+  const [dragging, setDragging] = React.useState(false);
+
+  const pct = ((value - min) / (max - min)) * 100;
+
+  const valueFromClientX = (clientX: number) => {
+    const track = trackRef.current;
+    if (!track) return value;
+    const rect = track.getBoundingClientRect();
+    const ratio = Math.min(1, Math.max(0, (clientX - rect.left) / rect.width));
+    const raw = min + ratio * (max - min);
+    return Math.min(max, Math.max(min, Math.round(raw / step) * step));
+  };
+
+  const handlePointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
+    e.currentTarget.setPointerCapture(e.pointerId);
+    setDragging(true);
+    onChange(valueFromClientX(e.clientX));
+  };
+  const handlePointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (!dragging) return;
+    onChange(valueFromClientX(e.clientX));
+  };
+  const handlePointerUp = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (!dragging) return;
+    setDragging(false);
+    onChangeEnd?.(valueFromClientX(e.clientX));
+  };
+
+  return (
+    <div
+      ref={trackRef}
+      className={cn('relative flex items-center touch-none select-none cursor-pointer flex-1', className)}
+      style={{ height: '2.5rem' }}
+      onPointerDown={handlePointerDown}
+      onPointerMove={handlePointerMove}
+      onPointerUp={handlePointerUp}
+      onPointerCancel={handlePointerUp}
+    >
+      <div
+        className="absolute left-0 right-0 rounded-full"
+        style={{ height: '4px', backgroundColor: 'var(--color-fg)', opacity: 0.15 }}
+      />
+      <div
+        className="absolute left-0 rounded-full"
+        style={{ height: '4px', width: `${pct}%`, backgroundColor: 'var(--color-fg)' }}
+      />
+      <div
+        className="absolute rounded-full"
+        style={{
+          width: '1.5rem', height: '1.5rem',
+          backgroundColor: 'var(--color-bg)',
+          border: '2px solid var(--color-fg)',
+          left: `calc(${pct}% - 0.75rem)`,
+          transition: dragging ? 'none' : 'left 0.15s ease',
+        }}
+      />
+    </div>
+  );
+};

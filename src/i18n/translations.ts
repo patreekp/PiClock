@@ -98,7 +98,16 @@ const translations = {
     'settings.scanning': 'Scanning...',
     'settings.language': 'Language',
     'settings.languageDesc': 'Interface language',
-
+    'settings.tab.appearance': 'Appearance',
+    'settings.tab.audio': 'Audio',
+    'settings.tab.weather': 'Weather',
+    'settings.tab.system': 'System',
+    'settings.brightness': 'Brightness',
+    'settings.brightnessDesc': 'Screen dimming (software overlay)',
+    'settings.volume': 'Volume',
+    'settings.volumeDesc': 'Alarm playback volume',
+    'settings.library': 'Audio Library',
+    'settings.libraryDisabledHint': 'Enable Song Highlights in the Audio tab to scan your library.',
     // Pomodoro settings
     'settings.pomodoro': 'Pomodoro',
     'settings.pomodoroStyle': 'Timer Style',
@@ -248,7 +257,17 @@ const translations = {
     'settings.scanning': 'Analisi in corso...',
     'settings.language': 'Lingua',
     'settings.languageDesc': "Lingua dell'interfaccia",
-
+    'settings.tab.appearance': 'Aspetto',
+    'settings.tab.audio': 'Audio',
+    'settings.tab.weather': 'Meteo',
+    'settings.tab.system': 'Sistema',
+    'settings.brightness': 'Luminosità',
+    'settings.brightnessDesc': 'Oscuramento schermo (overlay software)',
+    'settings.volume': 'Volume',
+    'settings.volumeDesc': 'Volume di riproduzione sveglie',
+    'settings.library': 'Libreria Audio',
+    'settings.libraryDisabledHint': 'Attiva Song Highlights nella scheda Audio per scansionare la libreria.',
+    
     // Pomodoro settings
     'settings.pomodoro': 'Pomodoro',
     'settings.pomodoroStyle': 'Stile timer',

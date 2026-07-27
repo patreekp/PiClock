@@ -94,6 +94,27 @@ The default path is `/media/alarms`. You can change it later from the Settings p
  
 PiClock has two separate processes that must both be running in dev mode.
  
+### Environment variables (optional)
+
+The backend defaults to port `3000` in development. On Linux, binding to port `80` (used by default in production, see the deployment section) requires elevated privileges — attempting it without them fails silently: no stacktrace, no visible error, the process appears to start (you'll even see the "server running" log line) but never actually binds, and exits on its own a few seconds later once its internal boot timers finish.
+
+To avoid this, the project supports a local `.env` file using Node's native `--env-file` flag (Node ≥20.6, no `dotenv` dependency needed):
+
+```bash
+cp .env.example .env
+# edit .env if you need a port other than 3000
+```
+
+Then start the backend with:
+
+```bash
+npm run server:dev   # equivalent to: node --env-file=.env server/index.js
+```
+
+`.env` is machine-specific and excluded from version control — `.env.example` is committed as a reference. `npm run server` (without `:dev`) remains unchanged and ignores `.env` entirely — it's intended for production on the Pi, where the port is set via systemd (`Environment=PORT=80`) instead.
+
+> **Troubleshooting tip:** if the server seems to "shut down on its own" a few seconds after starting, with no visible error and exit code `0`, suspect a failed bind to a privileged port before looking anywhere else. Quick test: `PORT=3000 node server/index.js`.
+
 ### Terminal 1 — Backend
  
 ```bash
@@ -285,6 +306,7 @@ From now on, the Pi boots → PiClock starts automatically → reachable at `htt
 piclock/
 ├── server/
 │   ├── index.js                         # Express entry point
+│   ├── sse.js                           # Shared SSE hub — broadcast() + sseHandler, mounted at /api/events
 │   ├── db/database.js                   # SQLite init and schema
 │   └── features/
 │       ├── clock/clockRouter.js
@@ -293,12 +315,15 @@ piclock/
 │       ├── alarms/alarmRouter.js + alarmService.js
 │       ├── audio/audioRouter.js + audioLibraryService.js
 │       ├── pomodoro/pomodoroRouter.js + pomodoroService.js
+│       ├── remote/remoteRouter.js + remoteService.js
 │       ├── config/configRouter.js
 │       └── system/systemRouter.js
 ├── src/
 │   ├── App.tsx
+│   ├── lib/
+│   │   └── sseHub.ts                    # Shared EventSource singleton, consumed by all stores
 │   ├── store/
-│   │   ├── useAppStore.ts               # Global Zustand store (config, theme, language)
+│   │   ├── useAppStore.ts               # Global Zustand store (config, theme, language, page slug, remote nav)
 │   │   └── usePomodoroStore.ts          # Pomodoro timer state, SSE connection, remote actions
 │   ├── components/
 │   │   ├── PageCarousel.tsx             # Swipe navigation + auto theme + remote-navigate listener
@@ -311,6 +336,7 @@ piclock/
 │       ├── pomodoro/PomodoroPage.tsx
 │       ├── todos/TodosPage.tsx
 │       ├── alarms/AlarmsPage.tsx + AlarmModal.tsx
+│       ├── remote/RemoteApp.tsx         # Companion control page, served at /remote
 │       └── settings/SettingsPage.tsx
 ├── piclockdb.sqlite                   # Auto-generated on first run
 ├── package.json
@@ -354,7 +380,7 @@ piclock/
 | `DELETE` | `/api/alarms/:id` | Delete an alarm |
 | `POST` | `/api/alarms/:id/stop` | Stop the currently ringing alarm |
 | `POST` | `/api/alarms/:id/snooze` | Snooze the currently ringing alarm |
-| `GET` | `/api/alarms/events` | SSE stream — `alarm:triggered`, `alarm:stopped` |
+| `POST` | `/api/alarms/:id/skip-next` | Toggle skip-next for an alarm |
  
 ### Audio library
  
@@ -376,23 +402,40 @@ Timer state lives on the backend (in memory, not persisted), so it can be contro
 | `POST` | `/api/pomodoro/pause` | Pause the running timer |
 | `POST` | `/api/pomodoro/reset` | Reset to the beginning of the cycle |
 | `POST` | `/api/pomodoro/skip` | Manually skip to the next phase (no auto-resume) |
-| `GET` | `/api/pomodoro/events` | SSE stream — `pomodoro:state`, `pomodoro:phase-complete`, `pomodoro:navigate` |
  
 ---
  
+### Remote control
+
+| Method | Endpoint | Description |
+|---|---|---|
+| `GET` | `/api/remote/state` | Currently displayed page on the main screen |
+| `POST` | `/api/remote/navigate` | Change the displayed page (`{ "page": "weather" }`) |
+
+### Real-time events
+
+| Method | Endpoint | Description |
+|---|---|---|
+| `GET` | `/api/events` | Single multiplexed SSE stream for the whole app. Named events: `alarm:triggered`, `alarm:stopped`, `alarms:changed`, `weather:updated`, `weather:error`, `pomodoro:state`, `pomodoro:phase-complete`, `pomodoro:navigate`, `todos:changed`, `remote:navigate` |
+| `GET` | `/api/audio/events` | Separate stream, audio library scan progress and errors (not yet merged into `/api/events`) |
+
 ## Architecture notes
  
 **Theme colors** — Always use `var(--color-fg)` / `var(--color-bg)` for inline style overrides. Never use Tailwind classes like `bg-current text-background` — they do not resolve correctly with the e-paper-style theme system.
  
 **UI components** — Always use the components in `ui-themed.tsx` (`ThemedSwitch`, `ThemedToggleGroup`, `ThemedButton`) for interactive controls. Do not use raw shadcn/ui components for these — they will not follow the theme correctly.
  
-**SSE streams** — The app uses three separate SSE endpoints: `/api/alarms/events` for alarm triggers, `/api/audio/events` for library scan progress, and `/api/pomodoro/events` for timer state. All three are consumed by the frontend and kept alive with a 25-second heartbeat.
+**SSE streams** — All real-time events (alarms, weather updates, Pomodoro state, to-do changes, remote-control navigation) are multiplexed over a **single** endpoint, `GET /api/events`, distinguished by named SSE event types (`alarm:triggered`, `weather:updated`, `pomodoro:state`, `todos:changed`, `remote:navigate`, etc.). The audio library scan (`/api/audio/events`) is currently the only feature that still uses its own dedicated stream.
+
+This consolidation was a deliberate fix, not the original design: browsers cap HTTP/1.1 connections to **6 per origin**, and with each feature originally opening its own long-lived `EventSource`, having both the main display and the `/remote` companion page open at once (see below) could exhaust that limit — causing pages to hang indefinitely in a loading state until one of the open tabs was closed. Server-side, `server/sse.js` exposes a shared `broadcast(event, data)` and `sseHandler`; client-side, `src/lib/sseHub.ts` exposes `onSseEvent(eventName, handler) → unsubscribe` backed by a single singleton `EventSource`. All stores (`usePomodoroStore`, `useWeatherStore`, `useTodoStore`, `useAlarmStore`, `useAppStore`) consume events through this shared hub instead of opening their own connection. Heartbeats every 25 seconds keep the single connection alive through proxies.
  
 **Song Highlights** — When enabled (`Local` mode), ffmpeg analyzes each audio file using ebur128 loudness measurement and stores the top-3 peak timestamps in SQLite. The first alarm play of the day starts from the loudest moment; subsequent plays start from the beginning. Requires `ffmpeg` to be installed on the system.
  
 **Auto theme** — `PageCarousel` recalculates sunrise/sunset every minute using the NOAA solar formula with the configured latitude/longitude. No external API call is made for this.
  
-**Pomodoro / remote control pattern** — The Pomodoro timer's state (phase, session index, running/paused, time remaining) lives on the server, not in the browser tab, using an in-memory state machine (`pomodoroService.js`) rather than SQLite — a running timer is meant to be ephemeral, so a server restart intentionally resets it rather than resuming a stale countdown. Any device that can reach `/api/pomodoro/*` (the Pi itself, or a phone on the same LAN) can start/pause/reset/skip the timer; every connected client is notified via SSE (`pomodoro:state`) and recomputes the countdown locally from a shared `endsAt` timestamp, so no per-second SSE traffic is needed. Starting the timer also emits `pomodoro:navigate`, which `PageCarousel` listens for to automatically switch the Pi's display to the Pomodoro page. This REST-endpoint-mutates-server-state + SSE-broadcasts-to-all-clients pattern is the intended foundation for a more generic remote-control feature (e.g. arbitrary page navigation from a second device), planned but not yet implemented.
+**Remote control (`/remote`)** — A companion page, served by the same Express backend at the `/remote` route (same origin, no separate server, no CORS). Designed for a narrow screen (phone), with always-visible page-switch buttons and a contextual control panel that changes based on whichever page is currently shown on the Pi's display: Pomodoro (start/pause/reset/skip), Weather (force refresh), Alarms (list + add/edit, reusing the same `CircularTimePicker` as the main Alarms page), and To-dos (list + add/check/delete). If an alarm is ringing, `AlarmModal` — mounted globally — takes over on `/remote` too, showing the same fullscreen stop/snooze overlay as the main display.
+
+The underlying pattern, first proven with the Pomodoro timer, is: state lives on the server (in memory for ephemeral things like the timer or "which page is showing", SQLite for persistent things like alarms/todos), any device on the LAN can mutate it via a REST endpoint, and every connected client — Pi included — is notified via SSE and updates itself. `useAppStore.ts` identifies pages by a string slug (`PageSlug: 'clock' | 'weather' | 'pomodoro' | 'todos' | 'alarms' | 'settings'`) rather than a numeric carousel index, so `/remote` can reference pages by name without knowing the Pi's swipe order; `setPage(slug)` updates local state and notifies the server via `POST /api/remote/navigate`, and `PageCarousel` listens for the resulting `remote:navigate` SSE event to switch pages without a physical swipe. Settings is not yet controllable from `/remote`.
  
 **node_modules on Pi** — Always run `npm install` directly on the Raspberry Pi after transferring files. Some native Node.js packages (like `better-sqlite3`) must be compiled for the target architecture.
  

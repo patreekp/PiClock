@@ -17,6 +17,7 @@ interface AppState {
     clock24h: boolean; showSeconds: boolean;
     alarmFolder: string; snoozeMinutes: number;
     highlightMode: HighlightMode;
+    volume: number; brightness: number;
     // Pomodoro
     pomodoroStyle: PomodoroStyle;
     pomodoroFocusMin: number;
@@ -29,6 +30,7 @@ interface AppState {
   setNotification: (msg: string, autoClearMs?: number) => void;
   fetchConfig: () => Promise<void>;
   updateConfig: (newConfig: Partial<AppState['config']>) => Promise<void>;
+  updateConfigLocal: (newConfig: Partial<AppState['config']>) => void;
   setTheme: (theme: ThemeMode) => Promise<void>;
   setLanguage: (language: Language) => Promise<void>;
 }
@@ -42,6 +44,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     clock24h: true, showSeconds: false,
     alarmFolder: '/media/alarms', snoozeMinutes: 1,
     highlightMode: 'off',
+    volume: 80, brightness: 100,
     pomodoroStyle: 'hourglass',
     pomodoroFocusMin: 25,
     pomodoroShortBreakMin: 5,
@@ -84,6 +87,8 @@ export const useAppStore = create<AppState>((set, get) => ({
           alarmFolder: data.alarmFolder ?? '/media/alarms',
           snoozeMinutes: parseInt(data.snoozeMinutes ?? '1', 10),
           highlightMode: (data.highlightMode as HighlightMode) ?? 'off',
+          volume: parseInt(data.volume ?? '80', 10),
+          brightness: parseInt(data.brightness ?? '100', 10),
           pomodoroStyle: (data.pomodoroStyle as PomodoroStyle) ?? 'hourglass',
           pomodoroFocusMin: parseInt(data.pomodoroFocusMin ?? '25', 10),
           pomodoroShortBreakMin: parseInt(data.pomodoroShortBreakMin ?? '5', 10),
@@ -100,6 +105,9 @@ export const useAppStore = create<AppState>((set, get) => ({
     set({ config: updated });
     try { await fetch('/api/config', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(newConfig) }); }
     catch (e) { console.error('Failed to update config', e); }
+  },
+  updateConfigLocal: (newConfig) => {
+    set(state => ({ config: { ...state.config, ...newConfig } }));
   },
   setTheme: async (theme) => {
     set({ theme });

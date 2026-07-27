@@ -28,6 +28,8 @@ Alarms support per-weekday scheduling — set an alarm to ring only on specific 
 
 **Internationalisation**  Full EN/IT interface, persisted in SQLite. Easily extensible to other languages by adding keys to `src/i18n/translations.ts`.
 
+**Remote control**  A lightweight companion page at `/remote`, reachable from any phone or device on the same local network. Lets you switch the page shown on the main display and control whatever's currently active — start/pause the Pomodoro timer, refresh the weather, add or edit alarms and to-dos — without touching the Pi itself. No extra app or server: same backend, same origin.
+
 ---
 
 ## Pages
@@ -42,6 +44,7 @@ The interface is a horizontal swipe carousel — four pages, all navigable by to
 | To-do | Task list with add/complete/delete | ![Screenshot](wiki/todoPageLightTheme.png) |
 | Alarms | Alarm list with per-day scheduling and skip-next control | ![Screenshot](wiki/alarmsPageLightTheme.png) ![Screenshot](wiki/alarmsPageEditLightTheme.png) |
 | Settings | Settings management | ![Screenshot](wiki/settingsPageLightTheme.png) |
+| Remote | Companion control page (phone-friendly), reachable at `/remote` | — |
 
 ---
 
@@ -55,7 +58,7 @@ The interface is a horizontal swipe carousel — four pages, all navigable by to
 | Weather | Open-Meteo API |
 | Audio playback | mpg123 / aplay (Linux/Pi) |
 | Audio analysis | ffmpeg (ebur128 loudness) |
-| Real-time events | SSE (Server-Sent Events) |
+| Real-time events | SSE (Server-Sent Events) — single multiplexed `/api/events` stream |
 
 ---
 
