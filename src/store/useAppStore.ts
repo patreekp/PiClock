@@ -5,6 +5,7 @@ export type ThemeMode = 'light' | 'dark' | 'auto';
 export type HighlightMode = 'off' | 'local' | 'audjust';
 export type Language = 'en' | 'it';
 export type PomodoroStyle = 'hourglass' | 'arc';
+export type BrightnessMode = 'manual' | 'auto';
 export type PageSlug = 'clock' | 'weather' | 'pomodoro' | 'todos' | 'alarms' | 'settings';
 
 interface AppState {
@@ -17,7 +18,10 @@ interface AppState {
     clock24h: boolean; showSeconds: boolean;
     alarmFolder: string; snoozeMinutes: number;
     highlightMode: HighlightMode;
-    volume: number; brightness: number;
+    volume: number;
+    brightness: number;
+    brightnessMode: BrightnessMode;
+    brightnessNight: number;
     // Pomodoro
     pomodoroStyle: PomodoroStyle;
     pomodoroFocusMin: number;
@@ -44,7 +48,10 @@ export const useAppStore = create<AppState>((set, get) => ({
     clock24h: true, showSeconds: false,
     alarmFolder: '/media/alarms', snoozeMinutes: 1,
     highlightMode: 'off',
-    volume: 80, brightness: 100,
+    volume: 80,
+    brightness: 100,
+    brightnessMode: 'manual',
+    brightnessNight: 30,
     pomodoroStyle: 'hourglass',
     pomodoroFocusMin: 25,
     pomodoroShortBreakMin: 5,
@@ -89,6 +96,8 @@ export const useAppStore = create<AppState>((set, get) => ({
           highlightMode: (data.highlightMode as HighlightMode) ?? 'off',
           volume: parseInt(data.volume ?? '80', 10),
           brightness: parseInt(data.brightness ?? '100', 10),
+          brightnessMode: (data.brightnessMode as BrightnessMode) ?? 'manual',
+          brightnessNight: parseInt(data.brightnessNight ?? '30', 10),
           pomodoroStyle: (data.pomodoroStyle as PomodoroStyle) ?? 'hourglass',
           pomodoroFocusMin: parseInt(data.pomodoroFocusMin ?? '25', 10),
           pomodoroShortBreakMin: parseInt(data.pomodoroShortBreakMin ?? '5', 10),

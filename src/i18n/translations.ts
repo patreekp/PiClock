@@ -108,6 +108,12 @@ const translations = {
     'settings.volumeDesc': 'Alarm playback volume',
     'settings.library': 'Audio Library',
     'settings.libraryDisabledHint': 'Enable Song Highlights in the Audio tab to scan your library.',
+    'settings.brightnessMode': 'Brightness Mode',
+    'settings.brightnessModeManual': 'Manual',
+    'settings.brightnessModeAuto': 'Auto',
+    'settings.brightnessDay': 'Day',
+    'settings.brightnessNight': 'Night',
+    'settings.brightnessAutoDesc': 'Dims from 23:30 to 05:00',
     // Pomodoro settings
     'settings.pomodoro': 'Pomodoro',
     'settings.pomodoroStyle': 'Timer Style',
@@ -267,7 +273,13 @@ const translations = {
     'settings.volumeDesc': 'Volume di riproduzione sveglie',
     'settings.library': 'Libreria Audio',
     'settings.libraryDisabledHint': 'Attiva Song Highlights nella scheda Audio per scansionare la libreria.',
-    
+    'settings.brightnessMode': 'Modalità Luminosità',
+    'settings.brightnessModeManual': 'Manuale',
+    'settings.brightnessModeAuto': 'Auto',
+    'settings.brightnessDay': 'Giorno',
+    'settings.brightnessNight': 'Notte',
+    'settings.brightnessAutoDesc': 'Si abbassa dalle 23:30 alle 05:00',
+
     // Pomodoro settings
     'settings.pomodoro': 'Pomodoro',
     'settings.pomodoroStyle': 'Stile timer',

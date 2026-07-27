@@ -8,6 +8,7 @@ import { broadcast } from '../../sse.js';
 
 const activeJobs = new Map();
 let currentAudioProc = null;
+let currentAuxProc = null; // ffmpeg upstream quando si pipa in aplay (ogg/wav)
 let audioLoopActive = false;
 let currentTrackName = null;
 
@@ -30,6 +31,30 @@ export function emitAlarmsChanged() {
 
 export function getCurrentTrackName() {
   return currentTrackName;
+}
+
+// ── Volume ────────────────────────────────────────────────────────────────────
+// Letto live dal DB ad ogni brano — un cambio di volume dallo slider si applica
+// dal prossimo brano in coda, non su quello già in riproduzione.
+function getVolumeConfig() {
+  const row = getDb().prepare(`SELECT value FROM config WHERE key = 'volume'`).get();
+  const v = parseInt(row?.value ?? '80', 10);
+  return Number.isFinite(v) ? Math.min(100, Math.max(0, v)) : 80;
+}
+
+// mpg123: scale di default (unity gain) è 32768. Mappiamo 0-100% su 0-65536
+// (0-200% di ampiezza) — a 80% (default app) risulta ~52428, vicino al
+// vecchio valore hardcoded 55000, quindi il volume "di fabbrica" suona
+// pressoché identico a prima.
+function mpg123ScaleForVolume(volumePercent) {
+  const clamped = Math.min(100, Math.max(0, volumePercent));
+  return Math.max(1, Math.round((clamped / 100) * 65536));
+}
+
+// ffmpeg filtro volume: stessa scala 0-200% di ampiezza per coerenza con mpg123.
+function ffmpegVolumeRatio(volumePercent) {
+  const clamped = Math.min(100, Math.max(0, volumePercent));
+  return ((clamped / 100) * 2).toFixed(2);
 }
 
 // ── Audio ─────────────────────────────────────────────────────────────────────
@@ -67,32 +92,7 @@ function getAudioFiles() {
   return { folder, files };
 }
 
-function buildPlayerCommand(filePath, skipSeconds = 0) {
-  const ext = path.extname(filePath).toLowerCase();
-  const isWindows = process.platform === 'win32';
-
-  if (isWindows) {
-    console.log(`[Audio] Piattaforma Windows — uso player di sistema`);
-    return { player: 'cmd', args: ['/c', 'start', '', '/wait', filePath] };
-  }
-
-  if (ext === '.mp3') {
-    const args = skipSeconds > 0
-      ? ['--scale', '55000', '--skip', String(Math.floor(skipSeconds)), filePath]
-      : ['--scale', '55000', filePath];
-    return { player: 'mpg123', args };
-  }
-
-  return { player: 'aplay', args: [filePath] };
-}
-
-function spawnAudioProcess(filePath, skipSeconds = 0) {
-  const { player, args } = buildPlayerCommand(filePath, skipSeconds);
-  console.log(`[Audio] Comando: ${player} ${args.join(' ')}`);
-
-  const proc = spawn(player, args, { stdio: ['ignore', 'pipe', 'pipe'], detached: false });
-  let started = false;
-
+function wireProcLogs(proc, player) {
   proc.stdout?.on('data', d => {
     const line = d.toString().trim();
     if (line) console.log(`[Audio][${player}] ${line}`);
@@ -103,9 +103,8 @@ function spawnAudioProcess(filePath, skipSeconds = 0) {
   });
 
   proc.on('spawn', () => {
-    started = true;
     currentAudioProc = proc;
-    console.log(`[Audio] ✅ Player avviato — PID: ${proc.pid}`);
+    console.log(`[Audio] ✅ Player avviato — PID: ${proc.pid} (${player})`);
   });
 
   proc.on('error', (e) => {
@@ -113,20 +112,64 @@ function spawnAudioProcess(filePath, skipSeconds = 0) {
     if (e.code === 'ENOENT') {
       const hint = player === 'mpg123' ? 'sudo apt install mpg123'
         : player === 'aplay' ? 'sudo apt install alsa-utils'
+        : player === 'ffmpeg' ? 'sudo apt install ffmpeg'
         : '(player di sistema)';
       console.error(`[Audio] ❌ "${player}" non trovato. ${hint !== '(player di sistema)' ? `Installa con: ${hint}` : 'Controlla i player predefiniti di Windows.'}`);
     }
-    if (!started) currentAudioProc = null;
   });
 
   proc.on('exit', (code, signal) => {
-    if (started) {
-      console.log(`[Audio] Player "${player}" (PID ${proc.pid}) terminato — code: ${code ?? '-'}, signal: ${signal ?? '-'}`);
-    }
+    console.log(`[Audio] Player "${player}" (PID ${proc.pid}) terminato — code: ${code ?? '-'}, signal: ${signal ?? '-'}`);
     if (currentAudioProc === proc) currentAudioProc = null;
   });
+}
 
-  return proc;
+function spawnAudioProcess(filePath, skipSeconds = 0, volume = 80) {
+  const ext = path.extname(filePath).toLowerCase();
+  const isWindows = process.platform === 'win32';
+
+  if (isWindows) {
+    console.log(`[Audio] Piattaforma Windows — uso player di sistema (volume non applicabile, solo dev)`);
+    const proc = spawn('cmd', ['/c', 'start', '', '/wait', filePath], { stdio: ['ignore', 'pipe', 'pipe'], detached: false });
+    wireProcLogs(proc, 'cmd');
+    return proc;
+  }
+
+  if (ext === '.mp3') {
+    const scale = mpg123ScaleForVolume(volume);
+    const args = skipSeconds > 0
+      ? ['--scale', String(scale), '--skip', String(Math.floor(skipSeconds)), filePath]
+      : ['--scale', String(scale), filePath];
+    console.log(`[Audio] Comando: mpg123 ${args.join(' ')}  (volume ${volume}% → scale ${scale})`);
+    const proc = spawn('mpg123', args, { stdio: ['ignore', 'pipe', 'pipe'], detached: false });
+    wireProcLogs(proc, 'mpg123');
+    return proc;
+  }
+
+  // .ogg / .wav — mpg123 non li legge, aplay non ha volume nativo:
+  // pipiamo ffmpeg (già dipendenza del progetto) con filtro volume verso aplay.
+  const gain = ffmpegVolumeRatio(volume);
+  const ffmpegArgs = ['-v', 'error', '-nostdin'];
+  if (skipSeconds > 0) ffmpegArgs.push('-ss', String(Math.floor(skipSeconds)));
+  ffmpegArgs.push('-i', filePath, '-af', `volume=${gain}`, '-f', 'wav', 'pipe:1');
+
+  console.log(`[Audio] Comando: ffmpeg ${ffmpegArgs.join(' ')} | aplay -q -  (volume ${volume}% → gain x${gain})`);
+
+  const ffmpegProc = spawn('ffmpeg', ffmpegArgs, { stdio: ['ignore', 'pipe', 'pipe'], detached: false });
+  const aplayProc = spawn('aplay', ['-q', '-'], { stdio: ['pipe', 'pipe', 'pipe'], detached: false });
+
+  ffmpegProc.stdout.pipe(aplayProc.stdin);
+  ffmpegProc.stderr?.on('data', d => {
+    const line = d.toString().trim();
+    if (line) console.log(`[Audio][ffmpeg] stderr: ${line}`);
+  });
+  ffmpegProc.on('error', (e) => console.error(`[Audio] ❌ Errore ffmpeg: ${e.message}`));
+  ffmpegProc.on('exit', () => { if (currentAuxProc === ffmpegProc) currentAuxProc = null; });
+
+  currentAuxProc = ffmpegProc;
+  wireProcLogs(aplayProc, 'aplay');
+
+  return aplayProc;
 }
 
 function pickRandomFileFallback(folder, files) {
@@ -183,7 +226,8 @@ function startAudioLoop(alarm) {
     currentTrackName = trackDisplay;
     if (alarm) emitAlarmTriggered({ ...alarm, trackName: currentTrackName });
 
-    const proc = spawnAudioProcess(filePath, skipSeconds);
+    const volume = getVolumeConfig();
+    const proc = spawnAudioProcess(filePath, skipSeconds, volume);
 
     proc.on('exit', (code, signal) => {
       if (signal) {
@@ -201,9 +245,14 @@ function startAudioLoop(alarm) {
 }
 
 export function stopAlarmAudio() {
-  console.log(`[Audio] Stop — loop: ${audioLoopActive}, proc PID: ${currentAudioProc?.pid ?? 'nessuno'}`);
+  console.log(`[Audio] Stop — loop: ${audioLoopActive}, proc PID: ${currentAudioProc?.pid ?? 'nessuno'}, aux PID: ${currentAuxProc?.pid ?? 'nessuno'}`);
   audioLoopActive = false;
   currentTrackName = null;
+
+  if (currentAuxProc) {
+    try { currentAuxProc.kill('SIGTERM'); } catch (e) { console.error(`[Audio] ❌ Errore kill aux: ${e.message}`); }
+    currentAuxProc = null;
+  }
 
   if (currentAudioProc) {
     try {

@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useAppStore } from '../../store/useAppStore';
 import { useTranslation } from '../../i18n/useTranslation';
 import { onSseEvent } from '../../lib/sseHub';
-import type { ThemeMode, HighlightMode, Language, PomodoroStyle } from '../../store/useAppStore';
+import type { ThemeMode, HighlightMode, Language, PomodoroStyle, BrightnessMode } from '../../store/useAppStore';
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
@@ -56,6 +56,7 @@ const SettingsPage = () => {
   const [libraryStatus, setLibraryStatus] = useState<LibraryStatus | null>(null);
   const [scanning, setScanning] = useState(false);
 
+  
   const TAB_OPTIONS: ToggleOption<SettingsTab>[] = [
     { value: 'appearance', label: t('settings.tab.appearance'), icon: <SunMoon size={16} /> },
     { value: 'audio',      label: t('settings.tab.audio'),      icon: <Music size={16} /> },
@@ -86,6 +87,11 @@ const SettingsPage = () => {
   const POMODORO_STYLE_OPTIONS: ToggleOption<PomodoroStyle>[] = [
     { value: 'hourglass', label: t('settings.pomodoroStyleHourglass') },
     { value: 'arc',       label: t('settings.pomodoroStyleArc') },
+  ];
+  
+  const BRIGHTNESS_MODE_OPTIONS: ToggleOption<BrightnessMode>[] = [
+    { value: 'manual', label: t('settings.brightnessModeManual') },
+    { value: 'auto',   label: t('settings.brightnessModeAuto') },
   ];
 
   const fetchLibraryStatus = async () => {
@@ -186,22 +192,58 @@ const SettingsPage = () => {
             </div>
 
             {/* Brightness */}
-            <div className="flex items-center justify-between group">
-              <div className="flex items-center gap-5">
-                <div className="p-3 border border-current/10 group-hover:border-current transition-colors"><Sun size={28} className="opacity-40" /></div>
-                <div>
-                  <Label className="text-2xl font-bold uppercase tracking-tight">{t('settings.brightness')}</Label>
-                  <p className="text-sm opacity-50 uppercase tracking-widest mt-1">{t('settings.brightnessDesc')}</p>
+            <div className="group">
+              <div className="flex items-center justify-between mb-5">
+                <div className="flex items-center gap-5">
+                  <div className="p-3 border border-current/10 group-hover:border-current transition-colors"><Sun size={28} className="opacity-40" /></div>
+                  <div>
+                    <Label className="text-2xl font-bold uppercase tracking-tight">{t('settings.brightness')}</Label>
+                    <p className="text-sm opacity-50 uppercase tracking-widest mt-1">
+                      {config.brightnessMode === 'auto' ? t('settings.brightnessAutoDesc') : t('settings.brightnessDesc')}
+                    </p>
+                  </div>
                 </div>
-              </div>
-              <div className="flex items-center gap-3 w-56">
-                <ThemedSlider
-                  value={config.brightness} min={20} max={100}
-                  onChange={(v) => updateConfigLocal({ brightness: v })}
-                  onChangeEnd={(v) => updateConfig({ brightness: v })}
+                <ThemedToggleGroup
+                  options={BRIGHTNESS_MODE_OPTIONS}
+                  value={config.brightnessMode}
+                  onChange={(val) => updateConfig({ brightnessMode: val })}
                 />
-                <span className="text-sm font-mono w-12 text-right opacity-70 flex-shrink-0">{config.brightness}%</span>
               </div>
+
+              {config.brightnessMode === 'manual' ? (
+                <div className="flex items-center gap-3 pl-16">
+                  <ThemedSlider
+                    showSteppers
+                    value={config.brightness} min={20} max={100}
+                    onChange={(v) => updateConfigLocal({ brightness: v })}
+                    onChangeEnd={(v) => updateConfig({ brightness: v })}
+                  />
+                  <span className="text-sm font-mono w-12 text-right opacity-70 flex-shrink-0">{config.brightness}%</span>
+                </div>
+              ) : (
+                <div className="pl-16 space-y-4">
+                  <div className="flex items-center gap-3">
+                    <span className="text-xs uppercase opacity-50 font-bold tracking-widest w-14 flex-shrink-0">{t('settings.brightnessDay')}</span>
+                    <ThemedSlider
+                      showSteppers
+                      value={config.brightness} min={20} max={100}
+                      onChange={(v) => updateConfigLocal({ brightness: v })}
+                      onChangeEnd={(v) => updateConfig({ brightness: v })}
+                    />
+                    <span className="text-sm font-mono w-12 text-right opacity-70 flex-shrink-0">{config.brightness}%</span>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <span className="text-xs uppercase opacity-50 font-bold tracking-widest w-14 flex-shrink-0">{t('settings.brightnessNight')}</span>
+                    <ThemedSlider
+                      showSteppers
+                      value={config.brightnessNight} min={10} max={100}
+                      onChange={(v) => updateConfigLocal({ brightnessNight: v })}
+                      onChangeEnd={(v) => updateConfig({ brightnessNight: v })}
+                    />
+                    <span className="text-sm font-mono w-12 text-right opacity-70 flex-shrink-0">{config.brightnessNight}%</span>
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Language */}
@@ -243,22 +285,17 @@ const SettingsPage = () => {
               <div className="flex items-center gap-4 mb-8"><AlarmClock size={28} /><Label className="text-2xl font-bold uppercase tracking-tight">{t('settings.audio')}</Label></div>
 
               {/* Volume */}
-              <div className="flex items-center justify-between gap-6 mb-8">
-                <div>
-                  <p className="text-sm font-bold uppercase tracking-widest">{t('settings.volume')}</p>
-                  <p className="text-xs opacity-50 uppercase tracking-widest mt-1">{t('settings.volumeDesc')}</p>
-                </div>
-                <div className="flex items-center gap-3 w-56">
+              <div className="flex items-center gap-3 w-64">
                   <Volume2 size={18} className="opacity-40 flex-shrink-0" />
                   <ThemedSlider
+                    showSteppers
                     value={config.volume} min={0} max={100}
                     onChange={(v) => updateConfigLocal({ volume: v })}
                     onChangeEnd={(v) => updateConfig({ volume: v })}
                   />
                   <span className="text-sm font-mono w-12 text-right opacity-70 flex-shrink-0">{config.volume}%</span>
                 </div>
-              </div>
-
+                
               <div className="flex items-center justify-between gap-6 mb-8">
                 <div className="flex-1 min-w-0">
                   <p className="text-xs uppercase opacity-50 font-bold tracking-widest mb-2">{t('settings.audioFolder')}</p>

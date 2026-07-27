@@ -3,6 +3,7 @@ import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { useEffect, useState } from "react";
 import Index from "./pages/Index";
 import NotFound from "./pages/NotFound";
 import AlarmModal from "./features/alarms/AlarmModal";
@@ -11,12 +12,35 @@ import { useAppStore } from "./store/useAppStore";
 
 const queryClient = new QueryClient();
 
+// Schedule fisso (non ancora configurabile) — notte 23:30 → 05:00.
+const NIGHT_START_MIN = 23 * 60 + 30;
+const NIGHT_END_MIN = 5 * 60;
+
+function computeEffectiveBrightness(mode: 'manual' | 'auto', day: number, night: number): number {
+  if (mode !== 'auto') return day;
+  const now = new Date();
+  const minutes = now.getHours() * 60 + now.getMinutes();
+  const isNight = minutes >= NIGHT_START_MIN || minutes < NIGHT_END_MIN;
+  return isNight ? night : day;
+}
+
 // Overlay di oscuramento software — solo per il display principale (Pi).
-// /remote è un dispositivo secondario (telefono) e non deve essere dimmato
-// dalla luminosità impostata per lo schermo del Pi.
+// /remote è un dispositivo secondario (telefono) e non va dimmato insieme al Pi.
 const BrightnessOverlay = () => {
-  const brightness = useAppStore((s) => s.config.brightness);
-  const opacity = Math.max(0, (100 - brightness) / 100);
+  const brightnessMode = useAppStore((s) => s.config.brightnessMode);
+  const brightnessDay = useAppStore((s) => s.config.brightness);
+  const brightnessNight = useAppStore((s) => s.config.brightnessNight);
+  const [effective, setEffective] = useState(brightnessDay);
+
+  useEffect(() => {
+    const update = () => setEffective(computeEffectiveBrightness(brightnessMode, brightnessDay, brightnessNight));
+    update();
+    const interval = setInterval(update, 60 * 1000);
+    return () => clearInterval(interval);
+  }, [brightnessMode, brightnessDay, brightnessNight]);
+
+  const opacity = Math.max(0, (100 - effective) / 100);
+
   return (
     <div
       style={{
@@ -25,7 +49,7 @@ const BrightnessOverlay = () => {
         opacity,
         pointerEvents: 'none',
         zIndex: 40,
-        transition: 'opacity 0.3s ease',
+        transition: 'opacity 0.6s ease',
       }}
     />
   );

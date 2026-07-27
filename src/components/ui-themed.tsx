@@ -130,11 +130,11 @@ export const ThemedButton = ({
     </button>
   );
 };
-
 // ── ThemedSlider ──────────────────────────────────────────────────────────────
 // Slider touch-friendly (volume/luminosità) — Pointer Events, nessuna dipendenza esterna.
-// onChange: aggiornamento locale continuo durante il drag.
-// onChangeEnd: fired al rilascio, usalo per persistere su config (evita spam di PUT).
+// onChange: aggiornamento locale continuo durante il drag / al click sui pulsanti +/-.
+// onChangeEnd: fired al rilascio o al click +/-, usalo per persistere su config.
+// showSteppers: aggiunge pulsanti +/- ai lati, utili su display meno reattivi al touch.
 interface ThemedSliderProps {
   value: number;
   min: number;
@@ -143,10 +143,19 @@ interface ThemedSliderProps {
   onChange: (val: number) => void;
   onChangeEnd?: (val: number) => void;
   className?: string;
+  showSteppers?: boolean;
 }
 
+const sliderStepBtnStyle: React.CSSProperties = {
+  width: '32px', height: '32px', flexShrink: 0,
+  border: '1px solid var(--color-fg)',
+  borderColor: 'color-mix(in srgb, var(--color-fg) 20%, transparent)',
+  background: 'transparent', color: 'var(--color-fg)', cursor: 'pointer', fontSize: '16px',
+  display: 'flex', alignItems: 'center', justifyContent: 'center',
+};
+
 export const ThemedSlider = ({
-  value, min, max, step = 1, onChange, onChangeEnd, className,
+  value, min, max, step = 1, onChange, onChangeEnd, className, showSteppers = false,
 }: ThemedSliderProps) => {
   const trackRef = React.useRef<HTMLDivElement>(null);
   const [dragging, setDragging] = React.useState(false);
@@ -177,34 +186,48 @@ export const ThemedSlider = ({
     onChangeEnd?.(valueFromClientX(e.clientX));
   };
 
+  const handleStep = (direction: 1 | -1) => {
+    const next = Math.min(max, Math.max(min, value + direction * step));
+    onChange(next);
+    onChangeEnd?.(next);
+  };
+
   return (
-    <div
-      ref={trackRef}
-      className={cn('relative flex items-center touch-none select-none cursor-pointer flex-1', className)}
-      style={{ height: '2.5rem' }}
-      onPointerDown={handlePointerDown}
-      onPointerMove={handlePointerMove}
-      onPointerUp={handlePointerUp}
-      onPointerCancel={handlePointerUp}
-    >
+    <div className={cn('flex items-center gap-2 flex-1', className)}>
+      {showSteppers && (
+        <button style={sliderStepBtnStyle} onClick={() => handleStep(-1)} aria-label="decrease">−</button>
+      )}
       <div
-        className="absolute left-0 right-0 rounded-full"
-        style={{ height: '4px', backgroundColor: 'var(--color-fg)', opacity: 0.15 }}
-      />
-      <div
-        className="absolute left-0 rounded-full"
-        style={{ height: '4px', width: `${pct}%`, backgroundColor: 'var(--color-fg)' }}
-      />
-      <div
-        className="absolute rounded-full"
-        style={{
-          width: '1.5rem', height: '1.5rem',
-          backgroundColor: 'var(--color-bg)',
-          border: '2px solid var(--color-fg)',
-          left: `calc(${pct}% - 0.75rem)`,
-          transition: dragging ? 'none' : 'left 0.15s ease',
-        }}
-      />
+        ref={trackRef}
+        className="relative flex items-center touch-none select-none cursor-pointer flex-1"
+        style={{ height: '2.5rem' }}
+        onPointerDown={handlePointerDown}
+        onPointerMove={handlePointerMove}
+        onPointerUp={handlePointerUp}
+        onPointerCancel={handlePointerUp}
+      >
+        <div
+          className="absolute left-0 right-0 rounded-full"
+          style={{ height: '4px', backgroundColor: 'var(--color-fg)', opacity: 0.15 }}
+        />
+        <div
+          className="absolute left-0 rounded-full"
+          style={{ height: '4px', width: `${pct}%`, backgroundColor: 'var(--color-fg)' }}
+        />
+        <div
+          className="absolute rounded-full"
+          style={{
+            width: '1.5rem', height: '1.5rem',
+            backgroundColor: 'var(--color-bg)',
+            border: '2px solid var(--color-fg)',
+            left: `calc(${pct}% - 0.75rem)`,
+            transition: dragging ? 'none' : 'left 0.15s ease',
+          }}
+        />
+      </div>
+      {showSteppers && (
+        <button style={sliderStepBtnStyle} onClick={() => handleStep(1)} aria-label="increase">+</button>
+      )}
     </div>
   );
 };
