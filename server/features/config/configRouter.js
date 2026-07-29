@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { getDb } from '../../db/database.js';
+import { broadcast } from '../../sse.js';
 
 export const configRouter = Router();
 
@@ -33,6 +34,12 @@ configRouter.put('/', (req, res) => {
     });
 
     updateMany(Object.entries(updates));
+
+    // Propaga a tutti i client connessi (Pi + eventuali /remote aperti)
+    // con i valori "come inviati" dal client (tipi JS originali, non stringificati),
+    // così il consumer lato client non deve fare parsing.
+    broadcast('config:changed', updates);
+
     res.json({ ok: true });
   } catch (e) {
     console.error('PUT /api/config error:', e);

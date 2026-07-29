@@ -40,6 +40,24 @@ interface AppState {
 }
 
 let remoteConnected = false;
+let configSyncStarted = false;
+
+// Sottoscrizione condivisa a config:changed — attivata la prima volta che
+// fetchConfig() o connectRemote() vengono chiamati (Pi o /remote, chi arriva prima).
+// Aggiorna lo stato locale SENZA richiamare updateConfig(), per evitare loop di broadcast.
+const startConfigSync = () => {
+  if (configSyncStarted) return;
+  configSyncStarted = true;
+
+  onSseEvent('config:changed', (data: Record<string, any>) => {
+    const { theme, language, ...configPatch } = data;
+    useAppStore.setState(state => ({
+      ...(theme !== undefined ? { theme } : {}),
+      ...(language !== undefined ? { language } : {}),
+      config: { ...state.config, ...configPatch },
+    }));
+  });
+};
 
 export const useAppStore = create<AppState>((set, get) => ({
   currentPage: 'clock', theme: 'light', language: 'en', notification: '',
@@ -67,6 +85,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     }).catch(e => console.error('Failed to notify remote navigate', e));
   },
   connectRemote: () => {
+    startConfigSync();
     if (remoteConnected) return;
     remoteConnected = true;
 
@@ -84,6 +103,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     if (autoClearMs) setTimeout(() => { if (get().notification === msg) set({ notification: '' }); }, autoClearMs);
   },
   fetchConfig: async () => {
+    startConfigSync();
     try {
       const res = await fetch('/api/config');
       const data = await res.json();

@@ -1,11 +1,13 @@
 import { useEffect, useState } from 'react';
 import { useAppStore, PageSlug } from '../../store/useAppStore';
+import type { ThemeMode, HighlightMode, Language, PomodoroStyle, BrightnessMode } from '../../store/useAppStore';
 import { usePomodoroStore } from '../../store/usePomodoroStore';
 import { useWeatherStore } from '../weather/useWeatherStore';
 import { useAlarmStore, Alarm } from '../alarms/useAlarmStore';
 import { useTodoStore } from '../todos/useTodoStore';
 import { useTranslation } from '../../i18n/useTranslation';
-import { ThemedButton, ThemedSwitch } from '../../components/ui-themed';
+import { ThemedButton, ThemedSwitch, ThemedToggleGroup, ThemedSlider } from '../../components/ui-themed';
+import type { ToggleOption } from '../../components/ui-themed';
 import CircularTimePicker from '../alarms/CircularTimePicker';
 import { Plus, Trash2 } from 'lucide-react';
 import type { TranslationKey } from '../../i18n/translations';
@@ -32,6 +34,34 @@ const DAY_KEYS_3: TranslationKey[] = [
   'alarms.days.mon3','alarms.days.tue3','alarms.days.wed3',
   'alarms.days.thu3','alarms.days.fri3','alarms.days.sat3','alarms.days.sun3',
 ];
+
+// ── Settings — mini stepper compatto per telefono ────────────────────────────
+const MiniStepper = ({
+  value, min, max, step = 1, onChange, suffix,
+}: {
+  value: number; min: number; max: number; step?: number;
+  onChange: (v: number) => void; suffix?: string;
+}) => (
+  <div className="flex items-center gap-2">
+    <button
+      onClick={() => onChange(Math.max(min, value - step))}
+      className="w-8 h-8 rounded-full flex items-center justify-center text-sm flex-shrink-0"
+      style={{ border: '1px solid', borderColor: 'color-mix(in srgb, var(--color-fg) 25%, transparent)', color: 'var(--color-fg)' }}
+    >−</button>
+    <span className="min-w-[42px] text-center text-sm font-bold font-mono">
+      {value}{suffix ? <span className="text-[10px] opacity-50 ml-0.5">{suffix}</span> : null}
+    </span>
+    <button
+      onClick={() => onChange(Math.min(max, value + step))}
+      className="w-8 h-8 rounded-full flex items-center justify-center text-sm flex-shrink-0"
+      style={{ border: '1px solid', borderColor: 'color-mix(in srgb, var(--color-fg) 25%, transparent)', color: 'var(--color-fg)' }}
+    >+</button>
+  </div>
+);
+
+const SettingsDivider = () => (
+  <div className="border-t opacity-10" style={{ borderColor: 'var(--color-fg)' }} />
+);
 
 const RemoteApp = () => {
   const { t } = useTranslation();
@@ -62,12 +92,55 @@ const RemoteApp = () => {
   const [selectedDays, setSelectedDays] = useState<number[]>([]);
 
   // ── Todos ─────────────────────────────────────────────────────────────────
-const { todos, fetchTodos, addTodo, toggleTodo, deleteTodo, initSse: initTodoSse } = useTodoStore();
-const [newTodo, setNewTodo] = useState('');
+  const { todos, fetchTodos, addTodo, toggleTodo, deleteTodo, initSse: initTodoSse } = useTodoStore();
+  const [newTodo, setNewTodo] = useState('');
+
+  // ── Settings ──────────────────────────────────────────────────────────────
+  const config = useAppStore(s => s.config);
+  const theme = useAppStore(s => s.theme);
+  const language = useAppStore(s => s.language);
+  const fetchConfig = useAppStore(s => s.fetchConfig);
+  const updateConfig = useAppStore(s => s.updateConfig);
+  const updateConfigLocal = useAppStore(s => s.updateConfigLocal);
+  const setTheme = useAppStore(s => s.setTheme);
+  const setLanguage = useAppStore(s => s.setLanguage);
+  const [folderDraft, setFolderDraft] = useState(config.alarmFolder);
+
+  const THEME_OPTIONS: ToggleOption<ThemeMode>[] = [
+    { value: 'light', label: t('settings.themeLight') },
+    { value: 'dark',  label: t('settings.themeDark') },
+    { value: 'auto',  label: t('settings.themeAuto') },
+  ];
+  const LANGUAGE_OPTIONS: ToggleOption<Language>[] = [
+    { value: 'en', label: 'EN' },
+    { value: 'it', label: 'IT' },
+  ];
+  const HIGHLIGHT_OPTIONS: ToggleOption<HighlightMode>[] = [
+    { value: 'off',     label: t('settings.highlightsOff') },
+    { value: 'local',   label: t('settings.highlightsLocal') },
+    { value: 'audjust', label: t('settings.highlightsAudjust'), disabled: true },
+  ];
+  const SNOOZE_OPTIONS: ToggleOption<number>[] = [
+    { value: 1,  label: t('settings.snooze1') },
+    { value: 5,  label: t('settings.snooze5') },
+    { value: 10, label: t('settings.snooze10') },
+  ];
+  const BRIGHTNESS_MODE_OPTIONS: ToggleOption<BrightnessMode>[] = [
+    { value: 'manual', label: t('settings.brightnessModeManual') },
+    { value: 'auto',   label: t('settings.brightnessModeAuto') },
+  ];
+  const POMODORO_STYLE_OPTIONS: ToggleOption<PomodoroStyle>[] = [
+    { value: 'hourglass', label: t('settings.pomodoroStyleHourglass') },
+    { value: 'arc',       label: t('settings.pomodoroStyleArc') },
+  ];
+
+  const minSuffix = t('settings.pomodoroMinSuffix');
 
   useEffect(() => { connectRemote(); }, [connectRemote]);
   useEffect(() => { connectPomodoro(); }, [connectPomodoro]);
   useEffect(() => { connectWeather(); }, [connectWeather]);
+  useEffect(() => { fetchConfig(); }, [fetchConfig]);
+  useEffect(() => { setFolderDraft(config.alarmFolder); }, [config.alarmFolder]);
   useEffect(() => {
     fetchAlarms();
     const cleanup = initAlarmSse();
@@ -115,33 +188,46 @@ const [newTodo, setNewTodo] = useState('');
     setNewTodo('');
   };
 
+  const saveFolder = () => {
+    const trimmed = folderDraft.trim();
+    if (trimmed) updateConfig({ alarmFolder: trimmed });
+  };
+
   return (
+    // fixed + overflow-y-auto crea un contesto di scroll INDIPENDENTE dal
+    // <body>, che ha overflow:hidden globale (necessario per il display
+    // fisso del Pi, ma incompatibile con /remote che deve poter scrollare).
     <div
-      className="min-h-screen w-full flex flex-col p-4 gap-6"
+      className="fixed inset-0 overflow-y-auto"
       style={{ backgroundColor: 'var(--color-bg)', color: 'var(--color-fg)' }}
     >
-      <h1 className="text-xl font-bold uppercase tracking-widest text-center">
-        {t('remote.title')}
-      </h1>
+      {/* Header sticky: titolo + nav restano visibili durante lo scroll */}
+      <div
+        className="sticky top-0 z-10 flex flex-col gap-4 p-4 pb-4"
+        style={{ backgroundColor: 'var(--color-bg)' }}
+      >
+        <h1 className="text-xl font-bold uppercase tracking-widest text-center">
+          {t('remote.title')}
+        </h1>
 
-      {/* Navigazione principale — sempre visibile */}
-      <div className="grid grid-cols-3 gap-2">
-        {NAV_PAGES.map(({ slug, labelKey }) => (
-          <ThemedButton
-            key={slug}
-            variant={currentPage === slug ? 'solid' : 'outline'}
-            onClick={() => setPage(slug)}
-            className="py-3 rounded-lg text-xs"
-          >
-            {t(labelKey)}
-          </ThemedButton>
-        ))}
+        <div className="grid grid-cols-3 gap-2">
+          {NAV_PAGES.map(({ slug, labelKey }) => (
+            <ThemedButton
+              key={slug}
+              variant={currentPage === slug ? 'solid' : 'outline'}
+              onClick={() => setPage(slug)}
+              className="py-3 rounded-lg text-xs"
+            >
+              {t(labelKey)}
+            </ThemedButton>
+          ))}
+        </div>
+
+        <div className="border-t opacity-20" style={{ borderColor: 'var(--color-fg)' }} />
       </div>
 
-      <div className="border-t opacity-20" style={{ borderColor: 'var(--color-fg)' }} />
-
-      {/* Pannello contestuale */}
-      <div className="flex-1 overflow-y-auto">
+      {/* Contenuto scrollabile */}
+      <div className="px-4 pb-8">
 
         {/* ── Pomodoro ── */}
         {currentPage === 'pomodoro' && (
@@ -286,7 +372,185 @@ const [newTodo, setNewTodo] = useState('');
           </div>
         )}
 
-        {currentPage !== 'pomodoro' && currentPage !== 'weather' && currentPage !== 'alarms' && currentPage !== 'todos' && (
+        {/* ── Settings ── */}
+        {currentPage === 'settings' && (
+          <div className="flex flex-col gap-6">
+
+            {/* Aspetto */}
+            <div className="flex flex-col gap-4">
+              <p className="text-xs font-bold uppercase tracking-widest opacity-50">{t('settings.tab.appearance')}</p>
+
+              <div className="flex items-center justify-between gap-3">
+                <span className="text-sm">{t('settings.theme')}</span>
+                <ThemedToggleGroup options={THEME_OPTIONS} value={theme} onChange={setTheme} />
+              </div>
+
+              <div className="flex items-center justify-between gap-3">
+                <span className="text-sm">{t('settings.language')}</span>
+                <ThemedToggleGroup options={LANGUAGE_OPTIONS} value={language} onChange={setLanguage} />
+              </div>
+
+              <div className="flex items-center justify-between">
+                <span className="text-sm">{t('settings.clock24h')}</span>
+                <ThemedSwitch checked={config.clock24h} onCheckedChange={(val) => updateConfig({ clock24h: val })} />
+              </div>
+
+              <div className="flex items-center justify-between">
+                <span className="text-sm">{t('settings.showSeconds')}</span>
+                <ThemedSwitch checked={config.showSeconds} onCheckedChange={(val) => updateConfig({ showSeconds: val })} />
+              </div>
+
+              <div className="flex items-center justify-between gap-3">
+                <span className="text-sm">{t('settings.brightness')}</span>
+                <ThemedToggleGroup
+                  options={BRIGHTNESS_MODE_OPTIONS}
+                  value={config.brightnessMode}
+                  onChange={(val) => updateConfig({ brightnessMode: val })}
+                />
+              </div>
+              <div className="flex items-center gap-3">
+                {config.brightnessMode === 'auto' && (
+                  <span className="text-xs opacity-50 w-10 flex-shrink-0">{t('settings.brightnessDay')}</span>
+                )}
+                <ThemedSlider
+                  showSteppers
+                  value={config.brightness} min={20} max={100}
+                  onChange={(v) => updateConfigLocal({ brightness: v })}
+                  onChangeEnd={(v) => updateConfig({ brightness: v })}
+                />
+                <span className="text-xs font-mono w-10 text-right opacity-70">{config.brightness}%</span>
+              </div>
+              {config.brightnessMode === 'auto' && (
+                <div className="flex items-center gap-3">
+                  <span className="text-xs opacity-50 w-10 flex-shrink-0">{t('settings.brightnessNight')}</span>
+                  <ThemedSlider
+                    showSteppers
+                    value={config.brightnessNight} min={10} max={100}
+                    onChange={(v) => updateConfigLocal({ brightnessNight: v })}
+                    onChangeEnd={(v) => updateConfig({ brightnessNight: v })}
+                  />
+                  <span className="text-xs font-mono w-10 text-right opacity-70">{config.brightnessNight}%</span>
+                </div>
+              )}
+            </div>
+
+            <SettingsDivider />
+
+            {/* Audio & Sveglie */}
+            <div className="flex flex-col gap-4">
+              <p className="text-xs font-bold uppercase tracking-widest opacity-50">{t('settings.tab.audio')}</p>
+
+              <div className="flex items-center gap-3">
+                <ThemedSlider
+                  showSteppers
+                  value={config.volume} min={0} max={100}
+                  onChange={(v) => updateConfigLocal({ volume: v })}
+                  onChangeEnd={(v) => updateConfig({ volume: v })}
+                />
+                <span className="text-xs font-mono w-10 text-right opacity-70">{config.volume}%</span>
+              </div>
+
+              <div className="flex items-center justify-between gap-3">
+                <span className="text-sm">{t('settings.snooze')}</span>
+                <ThemedToggleGroup options={SNOOZE_OPTIONS} value={config.snoozeMinutes} onChange={(val) => updateConfig({ snoozeMinutes: val })} />
+              </div>
+
+              <div className="flex flex-col gap-2">
+                <span className="text-xs opacity-50">{t('settings.audioFolder')}</span>
+                <div className="flex gap-2">
+                  <input
+                    value={folderDraft}
+                    onChange={(e) => setFolderDraft(e.target.value)}
+                    onKeyDown={(e) => e.key === 'Enter' && saveFolder()}
+                    className="flex-1 bg-transparent border rounded-lg px-3 h-10 text-xs font-mono"
+                    style={{ borderColor: 'var(--color-fg)' }}
+                  />
+                  <ThemedButton variant="outline" onClick={saveFolder} className="h-10 px-3 text-xs">
+                    {t('dialog.save')}
+                  </ThemedButton>
+                </div>
+              </div>
+
+              <div className="flex items-center justify-between gap-3">
+                <span className="text-sm">{t('settings.highlightsMode')}</span>
+                <ThemedToggleGroup options={HIGHLIGHT_OPTIONS} value={config.highlightMode} onChange={(val) => updateConfig({ highlightMode: val })} />
+              </div>
+            </div>
+
+            <SettingsDivider />
+
+            {/* Meteo */}
+            <div className="flex flex-col gap-4">
+              <p className="text-xs font-bold uppercase tracking-widest opacity-50">{t('settings.tab.weather')}</p>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <span className="text-xs opacity-50">{t('settings.lat')}</span>
+                  <input
+                    value={config.lat}
+                    onChange={(e) => updateConfigLocal({ lat: e.target.value })}
+                    onBlur={(e) => updateConfig({ lat: e.target.value })}
+                    className="w-full bg-transparent border rounded-lg px-3 h-10 text-xs font-mono"
+                    style={{ borderColor: 'var(--color-fg)' }}
+                  />
+                </div>
+                <div className="space-y-1">
+                  <span className="text-xs opacity-50">{t('settings.lon')}</span>
+                  <input
+                    value={config.lon}
+                    onChange={(e) => updateConfigLocal({ lon: e.target.value })}
+                    onBlur={(e) => updateConfig({ lon: e.target.value })}
+                    className="w-full bg-transparent border rounded-lg px-3 h-10 text-xs font-mono"
+                    style={{ borderColor: 'var(--color-fg)' }}
+                  />
+                </div>
+              </div>
+              <div className="space-y-1">
+                <span className="text-xs opacity-50">{t('settings.timezone')}</span>
+                <input
+                  value={config.timezone}
+                  onChange={(e) => updateConfigLocal({ timezone: e.target.value })}
+                  onBlur={(e) => updateConfig({ timezone: e.target.value })}
+                  className="w-full bg-transparent border rounded-lg px-3 h-10 text-xs font-mono"
+                  style={{ borderColor: 'var(--color-fg)' }}
+                />
+              </div>
+            </div>
+
+            <SettingsDivider />
+
+            {/* Pomodoro */}
+            <div className="flex flex-col gap-4">
+              <p className="text-xs font-bold uppercase tracking-widest opacity-50">{t('settings.pomodoro')}</p>
+
+              <div className="flex items-center justify-between gap-3">
+                <span className="text-sm">{t('settings.pomodoroStyle')}</span>
+                <ThemedToggleGroup options={POMODORO_STYLE_OPTIONS} value={config.pomodoroStyle} onChange={(val) => updateConfig({ pomodoroStyle: val })} />
+              </div>
+
+              <div className="flex items-center justify-between">
+                <span className="text-sm">{t('settings.pomodoroSessions')}</span>
+                <MiniStepper value={config.pomodoroSessions} min={1} max={8} onChange={(v) => updateConfig({ pomodoroSessions: v })} />
+              </div>
+
+              <div className="flex items-center justify-between">
+                <span className="text-xs opacity-50">{t('settings.pomodoroFocusMin')}</span>
+                <MiniStepper value={config.pomodoroFocusMin} min={1} max={60} step={5} onChange={(v) => updateConfig({ pomodoroFocusMin: v })} suffix={minSuffix} />
+              </div>
+
+              <div className="flex items-center justify-between">
+                <span className="text-xs opacity-50">{t('settings.pomodoroShortBreakMin')}</span>
+                <MiniStepper value={config.pomodoroShortBreakMin} min={1} max={30} onChange={(v) => updateConfig({ pomodoroShortBreakMin: v })} suffix={minSuffix} />
+              </div>
+
+              <div className="flex items-center justify-between">
+                <span className="text-xs opacity-50">{t('settings.pomodoroLongBreakMin')}</span>
+                <MiniStepper value={config.pomodoroLongBreakMin} min={1} max={60} step={5} onChange={(v) => updateConfig({ pomodoroLongBreakMin: v })} suffix={minSuffix} />
+              </div>
+            </div>
+          </div>
+        )}
+
+        {currentPage !== 'pomodoro' && currentPage !== 'weather' && currentPage !== 'alarms' && currentPage !== 'todos' && currentPage !== 'settings' && (
           <p className="text-center text-sm opacity-50 mt-8">
             {t('remote.noControls')}
           </p>
