@@ -3,19 +3,22 @@ import { useAppStore } from '../../store/useAppStore';
 import { useTranslation } from '../../i18n/useTranslation';
 import { onSseEvent } from '../../lib/sseHub';
 import type { ThemeMode, HighlightMode, Language, PomodoroStyle, BrightnessMode } from '../../store/useAppStore';
+import { useWifiStore, type WifiNetwork, type WifiConnectError } from '../../store/useWifiStore';
+import { VirtualKeyboard } from '../wifi/VirtualKeyboard';
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import {
   Moon, Sun, Clock, MapPin, Globe, Pencil, SunMoon, AlarmClock, Music,
   Loader2, RefreshCw, Languages, Timer, Volume2, Cpu,
+  Wifi, WifiOff, Lock, Eye, EyeOff,
 } from 'lucide-react';
 import { ThemedSwitch, ThemedToggleGroup, ThemedButton, ThemedSlider } from '@/components/ui-themed';
 import type { ToggleOption } from '@/components/ui-themed';
 
 interface LibraryStatus { total: number; scanned: number; pending: number; lastScan: string | null; scanInProgress: boolean; }
 
-type SettingsTab = 'appearance' | 'audio' | 'weather' | 'pomodoro' | 'system';
+type SettingsTab = 'appearance' | 'audio' | 'weather' | 'pomodoro' | 'network' | 'system';
 
 // ── Minimal number stepper ────────────────────────────────────────────────────
 const Stepper = ({
@@ -48,7 +51,7 @@ const Stepper = ({
 );
 
 const SettingsPage = () => {
-  const { theme, setTheme, config, updateConfig, updateConfigLocal, setLanguage } = useAppStore();
+  const { theme, setTheme, config, updateConfig, updateConfigLocal, setLanguage, setNotification } = useAppStore();
   const { t, language } = useTranslation();
   const [activeTab, setActiveTab] = useState<SettingsTab>('appearance');
   const [folderDialogOpen, setFolderDialogOpen] = useState(false);
@@ -56,12 +59,61 @@ const SettingsPage = () => {
   const [libraryStatus, setLibraryStatus] = useState<LibraryStatus | null>(null);
   const [scanning, setScanning] = useState(false);
 
-  
+  const wifi = useWifiStore();
+  const [wifiDialogOpen, setWifiDialogOpen] = useState(false);
+  const [wifiPendingSsid, setWifiPendingSsid] = useState<string | null>(null);
+  const [wifiPasswordDraft, setWifiPasswordDraft] = useState('');
+  const [wifiShowPassword, setWifiShowPassword] = useState(false);
+  const [wifiConnectError, setWifiConnectError] = useState<WifiConnectError | null>(null);
+
+  useEffect(() => { wifi.connect(); wifi.fetchSaved(); }, []);
+  useEffect(() => {
+    if (activeTab === 'network' && wifi.supported && wifi.enabled && wifi.networks.length === 0 && !wifi.scanning) {
+      wifi.scan();
+    }
+  }, [activeTab, wifi.supported, wifi.enabled]);
+
+  const wifiKnownSsids = new Set(wifi.saved.map(s => s.ssid));
+  const wifiSavedNotInRange = wifi.saved.filter(s => !wifi.networks.some(n => n.ssid === s.ssid));
+
+  const handleWifiNetworkClick = async (net: WifiNetwork) => {
+    if (net.active || wifi.connectingSsid) return;
+    if (net.secured && !wifiKnownSsids.has(net.ssid)) {
+      setWifiPendingSsid(net.ssid);
+      setWifiPasswordDraft('');
+      setWifiShowPassword(false);
+      setWifiConnectError(null);
+      setWifiDialogOpen(true);
+      return;
+    }
+    const result = await wifi.connectToNetwork(net.ssid);
+    if (result.ok) wifi.fetchSaved();
+    else setNotification(t(`wifi.error.${result.error}`), 5000);
+  };
+
+  const handleWifiDialogSubmit = async () => {
+    if (!wifiPendingSsid) return;
+    const result = await wifi.connectToNetwork(wifiPendingSsid, wifiPasswordDraft);
+    if (result.ok) { setWifiDialogOpen(false); wifi.fetchSaved(); }
+    else setWifiConnectError(result.error ?? 'connectFailed');
+  };
+
+  const handleAutoReconnect = async (enabled: boolean) => {
+    updateConfigLocal({ wifiAutoReconnect: enabled });
+    try {
+      await fetch('/api/wifi/autoreconnect', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ enabled }),
+      });
+    } catch (e) { console.error('Failed to set wifi autoreconnect', e); }
+  };
+
+
   const TAB_OPTIONS: ToggleOption<SettingsTab>[] = [
     { value: 'appearance', label: t('settings.tab.appearance'), icon: <SunMoon size={16} /> },
     { value: 'audio',      label: t('settings.tab.audio'),      icon: <Music size={16} /> },
     { value: 'weather',    label: t('settings.tab.weather'),    icon: <MapPin size={16} /> },
     { value: 'pomodoro',   label: t('settings.pomodoro'),       icon: <Timer size={16} /> },
+    { value: 'network',    label: t('settings.tab.network'),    icon: <Wifi size={16} /> },
     { value: 'system',     label: t('settings.tab.system'),     icon: <Cpu size={16} /> },
   ];
 
@@ -396,6 +448,98 @@ const SettingsPage = () => {
           </div>
         )}
 
+        {/* ── Rete ── */}
+        {activeTab === 'network' && (
+          <div>
+            <div className="flex items-center justify-between group">
+              <div className="flex items-center gap-5">
+                <div className="p-3 border border-current/10 group-hover:border-current transition-colors">
+                  {wifi.enabled ? <Wifi size={28} /> : <WifiOff size={28} className="opacity-40" />}
+                </div>
+                <div>
+                  <Label className="text-2xl font-bold uppercase tracking-tight">{t('wifi.title')}</Label>
+                  <p className="text-sm opacity-50 uppercase tracking-widest mt-1">
+                    {!wifi.supported ? t('wifi.unsupported') : wifi.enabled ? t('wifi.enabledDesc') : t('wifi.disabledDesc')}
+                  </p>
+                </div>
+              </div>
+              {wifi.supported && <ThemedSwitch checked={wifi.enabled} onCheckedChange={wifi.toggleEnabled} />}
+            </div>
+
+            {!wifi.supported && wifi.reason && (
+              <p className="text-xs opacity-40 uppercase tracking-widest mt-3 pl-16">{wifi.reason}</p>
+            )}
+
+            {wifi.supported && wifi.enabled && (
+              <div className="mt-10 space-y-10">
+                {wifi.connected && (
+                  <div className="flex items-center justify-between gap-4 p-4 border border-current/10">
+                    <div>
+                      <p className="text-xs uppercase opacity-50 font-bold tracking-widest mb-1">{t('wifi.connectedTo')}</p>
+                      <p className="text-lg font-bold">{wifi.connected.ssid}</p>
+                      {wifi.connected.ip && <p className="text-xs opacity-40 font-mono mt-1">{wifi.connected.ip}</p>}
+                    </div>
+                    <ThemedButton onClick={wifi.disconnect} className="h-11 px-5 text-xs flex-shrink-0">{t('wifi.disconnect')}</ThemedButton>
+                  </div>
+                )}
+
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-bold uppercase tracking-widest">{t('wifi.autoReconnect')}</p>
+                    <p className="text-xs opacity-50 uppercase tracking-widest mt-1">{t('wifi.autoReconnectDesc')}</p>
+                  </div>
+                  <ThemedSwitch checked={config.wifiAutoReconnect} onCheckedChange={handleAutoReconnect} />
+                </div>
+
+                <div>
+                  <div className="flex items-center justify-between mb-4">
+                    <p className="text-xs uppercase opacity-50 font-bold tracking-widest">{t('wifi.available')}</p>
+                    <ThemedButton disabled={wifi.scanning} onClick={wifi.scan} className="h-10 px-4 text-xs">
+                      {wifi.scanning ? <><Loader2 size={14} className="animate-spin" /> {t('wifi.scanning')}</> : <><RefreshCw size={14} /> {t('wifi.scan')}</>}
+                    </ThemedButton>
+                  </div>
+                  <div className="space-y-2">
+                    {wifi.networks.length === 0 && !wifi.scanning && (
+                      <p className="text-sm opacity-40 uppercase tracking-widest">{t('wifi.noNetworks')}</p>
+                    )}
+                    {wifi.networks.map((net) => (
+                      <button
+                        key={net.ssid}
+                        onClick={() => handleWifiNetworkClick(net)}
+                        disabled={!!wifi.connectingSsid}
+                        className="w-full flex items-center justify-between gap-4 p-3 border border-current/10 hover:border-current transition-colors text-left disabled:opacity-50"
+                      >
+                        <div className="flex items-center gap-3 min-w-0">
+                          {net.secured && <Lock size={14} className="opacity-50 flex-shrink-0" />}
+                          <span className="font-bold truncate">{net.ssid}</span>
+                          {net.active && <span className="text-[10px] uppercase opacity-50 tracking-widest flex-shrink-0">{t('wifi.connectedTo')}</span>}
+                        </div>
+                        <div className="flex items-center gap-2 opacity-50 flex-shrink-0">
+                          {wifi.connectingSsid === net.ssid ? <Loader2 size={14} className="animate-spin" /> : <span className="text-xs font-mono">{net.signal}%</span>}
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {wifiSavedNotInRange.length > 0 && (
+                  <div>
+                    <p className="text-xs uppercase opacity-50 font-bold tracking-widest mb-4">{t('wifi.saved')}</p>
+                    <div className="space-y-2">
+                      {wifiSavedNotInRange.map((s) => (
+                        <div key={s.ssid} className="flex items-center justify-between gap-4 p-3 border border-current/10">
+                          <span className="font-bold truncate">{s.ssid}</span>
+                          <ThemedButton onClick={() => wifi.forget(s.ssid)} className="h-9 px-4 text-xs flex-shrink-0">{t('wifi.forget')}</ThemedButton>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+
         {/* ── Sistema ── */}
         {activeTab === 'system' && (
           <div>
@@ -453,6 +597,51 @@ const SettingsPage = () => {
           <DialogFooter className="flex gap-3 sm:justify-start">
             <ThemedButton variant="solid" onClick={handleFolderSave} className="flex-1 h-12 text-sm">{t('dialog.save')}</ThemedButton>
             <ThemedButton onClick={() => setFolderDialogOpen(false)} className="flex-1 h-12 text-sm">{t('dialog.cancel')}</ThemedButton>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* WiFi Password Dialog */}
+      <Dialog open={wifiDialogOpen} onOpenChange={(open) => { setWifiDialogOpen(open); if (!open) setWifiPendingSsid(null); }}>
+        <DialogContent className="bg-[var(--color-bg)] text-[var(--color-fg)] border border-current rounded-none shadow-none max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="text-xl font-bold uppercase tracking-widest truncate">{wifiPendingSsid}</DialogTitle>
+          </DialogHeader>
+          <div className="py-2 space-y-4">
+            <Label className="text-xs uppercase opacity-50 font-bold tracking-widest">{t('wifi.enterPassword')}</Label>
+            <div className="relative">
+              <Input
+                value={wifiPasswordDraft}
+                readOnly
+                type={wifiShowPassword ? 'text' : 'password'}
+                autoComplete="off" autoCorrect="off" autoCapitalize="off" spellCheck={false}
+                placeholder={t('wifi.password')}
+                className="bg-transparent border-current rounded-none h-14 font-mono text-lg placeholder:opacity-30 focus-visible:ring-0 pr-12"
+              />
+              <button
+                type="button"
+                onClick={() => setWifiShowPassword(!wifiShowPassword)}
+                className="absolute right-3 top-1/2 -translate-y-1/2 opacity-50 hover:opacity-100 transition-opacity"
+                aria-label="toggle password visibility"
+              >
+                {wifiShowPassword ? <EyeOff size={20} /> : <Eye size={20} />}
+              </button>
+            </div>
+            {wifiConnectError && (
+              <p className="text-xs uppercase tracking-widest" style={{ color: '#c0392b' }}>{t(`wifi.error.${wifiConnectError}`)}</p>
+            )}
+            <VirtualKeyboard value={wifiPasswordDraft} onChange={setWifiPasswordDraft} onSubmit={handleWifiDialogSubmit} />
+          </div>
+          <DialogFooter className="flex gap-3 sm:justify-start">
+            <ThemedButton
+              variant="solid"
+              disabled={!!wifi.connectingSsid}
+              onClick={handleWifiDialogSubmit}
+              className="flex-1 h-12 text-sm"
+            >
+              {wifi.connectingSsid ? <><Loader2 size={15} className="animate-spin" /> {t('wifi.connecting')}</> : t('wifi.connect')}
+            </ThemedButton>
+            <ThemedButton onClick={() => setWifiDialogOpen(false)} className="flex-1 h-12 text-sm">{t('dialog.cancel')}</ThemedButton>
           </DialogFooter>
         </DialogContent>
       </Dialog>

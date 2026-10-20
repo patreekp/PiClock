@@ -37,6 +37,7 @@ try { db.exec(`ALTER TABLE alarms ADD COLUMN skip_next INTEGER NOT NULL DEFAULT 
     alarmFolder: '/media/alarms', snoozeMinutes: '1',
     highlightMode: 'off', audjustApiKey: '',
     language: 'en',
+    wifiAutoReconnect: 'true',
     // Pomodoro
     pomodoroStyle: 'hourglass',   // 'hourglass' | 'arc'
     pomodoroFocusMin: '25',

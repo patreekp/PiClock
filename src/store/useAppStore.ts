@@ -28,6 +28,7 @@ interface AppState {
     pomodoroShortBreakMin: number;
     pomodoroLongBreakMin: number;
     pomodoroSessions: number;
+    wifiAutoReconnect: boolean;
   };
   setPage: (page: PageSlug) => void;
   connectRemote: () => void;
@@ -75,6 +76,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     pomodoroShortBreakMin: 5,
     pomodoroLongBreakMin: 15,
     pomodoroSessions: 4,
+    wifiAutoReconnect: true,
   },
   setPage: (page) => {
     set({ currentPage: page });
@@ -123,6 +125,7 @@ export const useAppStore = create<AppState>((set, get) => ({
           pomodoroShortBreakMin: parseInt(data.pomodoroShortBreakMin ?? '5', 10),
           pomodoroLongBreakMin: parseInt(data.pomodoroLongBreakMin ?? '15', 10),
           pomodoroSessions: parseInt(data.pomodoroSessions ?? '4', 10),
+          wifiAutoReconnect: data.wifiAutoReconnect !== 'false',
         },
         theme: (data.theme as ThemeMode) || 'light',
         language: (data.language as Language) || 'en',

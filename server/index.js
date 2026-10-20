@@ -15,6 +15,7 @@ import { initAlarmScheduler } from './features/alarms/alarmService.js';
 import { scanAudioLibrary } from './features/audio/audioLibraryService.js';
 import { getDb } from './db/database.js';
 import { systemRouter } from './features/system/systemRouter.js';
+import { wifiRouter } from './features/wifi/wifiRouter.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -33,6 +34,7 @@ app.use('/api/audio', audioRouter);
 app.use('/api/pomodoro', pomodoroRouter);
 app.use('/api/remote', remoteRouter);
 app.use('/api/system', systemRouter);
+app.use('/api/wifi', wifiRouter);
 
 initDb();
 initAlarmScheduler();

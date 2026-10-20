@@ -317,14 +317,16 @@ piclock/
 │       ├── pomodoro/pomodoroRouter.js + pomodoroService.js
 │       ├── remote/remoteRouter.js + remoteService.js
 │       ├── config/configRouter.js
-│       └── system/systemRouter.js
+│       ├── system/systemRouter.js
+│       └── wifi/wifiRouter.js + wifiService.js
 ├── src/
 │   ├── App.tsx
 │   ├── lib/
 │   │   └── sseHub.ts                    # Shared EventSource singleton, consumed by all stores
 │   ├── store/
 │   │   ├── useAppStore.ts               # Global Zustand store (config, theme, language, page slug, remote nav)
-│   │   └── usePomodoroStore.ts          # Pomodoro timer state, SSE connection, remote actions
+│   │   ├── usePomodoroStore.ts          # Pomodoro timer state, SSE connection, remote actions
+│   │   └── useWifiStore.ts              # WiFi status/scan/connect state, SSE connection
 │   ├── components/
 │   │   ├── PageCarousel.tsx             # Swipe navigation + auto theme + remote-navigate listener
 │   │   └── ui-themed.tsx               # ThemedButton, ThemedSwitch, ThemedToggleGroup
@@ -336,6 +338,7 @@ piclock/
 │       ├── pomodoro/PomodoroPage.tsx
 │       ├── todos/TodosPage.tsx
 │       ├── alarms/AlarmsPage.tsx + AlarmModal.tsx
+│       ├── wifi/VirtualKeyboard.tsx     # Themed on-screen keyboard, used for WiFi password entry
 │       ├── remote/RemoteApp.tsx         # Companion control page, served at /remote
 │       └── settings/SettingsPage.tsx
 ├── piclockdb.sqlite                   # Auto-generated on first run
@@ -412,11 +415,25 @@ Timer state lives on the backend (in memory, not persisted), so it can be contro
 | `GET` | `/api/remote/state` | Currently displayed page on the main screen |
 | `POST` | `/api/remote/navigate` | Change the displayed page (`{ "page": "weather" }`) |
 
+### WiFi
+
+| Method | Endpoint | Description |
+|---|---|---|
+| `GET` | `/api/wifi/status` | Radio on/off, current connection (SSID/signal/IP), `supported` flag |
+| `POST` | `/api/wifi/toggle` | Turn the WiFi radio on/off (`{ "enabled": true }`) |
+| `GET` | `/api/wifi/networks` | Last cached scan result + `scanning` flag (no new scan triggered) |
+| `POST` | `/api/wifi/scan` | Start a fresh scan; progress/result arrive via SSE |
+| `POST` | `/api/wifi/connect` | Connect to a network (`{ "ssid", "password"? }`) |
+| `POST` | `/api/wifi/disconnect` | Disconnect the active connection |
+| `GET` | `/api/wifi/saved` | Saved (known) network profiles + their autoconnect flag |
+| `DELETE` | `/api/wifi/saved/:ssid` | Forget a saved network |
+| `POST` | `/api/wifi/autoreconnect` | Global autoreconnect toggle (`{ "enabled" }`) — applied to all saved profiles and persisted to `config.wifiAutoReconnect` |
+
 ### Real-time events
 
 | Method | Endpoint | Description |
 |---|---|---|
-| `GET` | `/api/events` | Single multiplexed SSE stream for the whole app. Named events: `alarm:triggered`, `alarm:stopped`, `alarms:changed`, `weather:updated`, `weather:error`, `pomodoro:state`, `pomodoro:phase-complete`, `pomodoro:navigate`, `todos:changed`, `remote:navigate` |
+| `GET` | `/api/events` | Single multiplexed SSE stream for the whole app. Named events: `alarm:triggered`, `alarm:stopped`, `alarms:changed`, `weather:updated`, `weather:error`, `pomodoro:state`, `pomodoro:phase-complete`, `pomodoro:navigate`, `todos:changed`, `remote:navigate`, `config:changed`, `wifi:status`, `wifi:scan-start`, `wifi:scan-result`, `wifi:scan-error`, `wifi:saved-changed` |
 | `GET` | `/api/audio/events` | Separate stream, audio library scan progress and errors (not yet merged into `/api/events`) |
 
 ## Architecture notes
@@ -426,6 +443,10 @@ Timer state lives on the backend (in memory, not persisted), so it can be contro
 **UI components** — Always use the components in `ui-themed.tsx` (`ThemedSwitch`, `ThemedToggleGroup`, `ThemedButton`) for interactive controls. Do not use raw shadcn/ui components for these — they will not follow the theme correctly.
  
 **SSE streams** — All real-time events (alarms, weather updates, Pomodoro state, to-do changes, remote-control navigation) are multiplexed over a **single** endpoint, `GET /api/events`, distinguished by named SSE event types (`alarm:triggered`, `weather:updated`, `pomodoro:state`, `todos:changed`, `remote:navigate`, etc.). The audio library scan (`/api/audio/events`) is currently the only feature that still uses its own dedicated stream.
+
+**WiFi management** — `server/features/wifi/wifiService.js` picks one of three implementations at module load, based on the host: on Linux with `nmcli` available it drives real NetworkManager commands (via `execFile` with argument arrays, never shell string interpolation, since SSID/password are user input); on Linux without `nmcli` it reports `supported: false` with a reason instead of masking a broken install; on any non-Linux platform (e.g. developing on Windows) it transparently falls back to an in-memory mock implementation, so the whole panel — scan, connect, wrong-password error, forget — is testable without a real Pi. The "Autoreconnect" toggle maps to NetworkManager's per-connection `connection.autoconnect` property, applied to every saved WiFi profile, and the desired state is persisted as the `wifiAutoReconnect` config flag (same `config` table as every other setting). If `nmcli` commands fail with a polkit/"not authorized" error when PiClock runs as a systemd service (no active logical session), either run `nmcli` as the same user that owns an active session, or add a polkit rule granting `org.freedesktop.NetworkManager.network-control` / `...settings.modify.own` to that user.
+
+**Virtual keyboard** — `src/features/wifi/VirtualKeyboard.tsx` is a themed on-screen keyboard (letters + a dedicated numbers/symbols page, Shift, backspace, space, enter) used for entering WiFi passwords on the touchscreen, which has no physical keyboard. No accents, no emoji, no autocomplete — it follows the same `var(--color-fg)`/`var(--color-bg)` token convention and press-feedback style as the rest of the app. The password field itself is `readOnly`, so text only ever comes from this component.
 
 This consolidation was a deliberate fix, not the original design: browsers cap HTTP/1.1 connections to **6 per origin**, and with each feature originally opening its own long-lived `EventSource`, having both the main display and the `/remote` companion page open at once (see below) could exhaust that limit — causing pages to hang indefinitely in a loading state until one of the open tabs was closed. Server-side, `server/sse.js` exposes a shared `broadcast(event, data)` and `sseHandler`; client-side, `src/lib/sseHub.ts` exposes `onSseEvent(eventName, handler) → unsubscribe` backed by a single singleton `EventSource`. All stores (`usePomodoroStore`, `useWeatherStore`, `useTodoStore`, `useAlarmStore`, `useAppStore`) consume events through this shared hub instead of opening their own connection. Heartbeats every 25 seconds keep the single connection alive through proxies.
  
