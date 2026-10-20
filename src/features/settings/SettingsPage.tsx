@@ -5,13 +5,14 @@ import { onSseEvent } from '../../lib/sseHub';
 import type { ThemeMode, HighlightMode, Language, PomodoroStyle, BrightnessMode } from '../../store/useAppStore';
 import { useWifiStore, type WifiNetwork, type WifiConnectError } from '../../store/useWifiStore';
 import { VirtualKeyboard } from '../wifi/VirtualKeyboard';
+import { AudioLibraryManager } from '../audio/AudioLibraryManager';
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import {
   Moon, Sun, Clock, MapPin, Globe, Pencil, SunMoon, AlarmClock, Music,
   Loader2, RefreshCw, Languages, Timer, Volume2, Cpu,
-  Wifi, WifiOff, Lock, Eye, EyeOff,
+  Wifi, WifiOff, Lock, Eye, EyeOff, Folder,
 } from 'lucide-react';
 import { ThemedSwitch, ThemedToggleGroup, ThemedButton, ThemedSlider } from '@/components/ui-themed';
 import type { ToggleOption } from '@/components/ui-themed';
@@ -577,6 +578,11 @@ const SettingsPage = () => {
                 </div>
               </div>
             )}
+
+            <div className="mt-10 pt-10 border-t border-current/10">
+              <div className="flex items-center gap-4 mb-8"><Folder size={28} /><Label className="text-2xl font-bold uppercase tracking-tight">{t('library.title')}</Label></div>
+              <AudioLibraryManager />
+            </div>
           </div>
         )}
 

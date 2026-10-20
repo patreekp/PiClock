@@ -2,6 +2,7 @@ import { spawn } from 'child_process';
 import fs from 'fs';
 import path from 'path';
 import { getDb } from '../../db/database.js';
+import { walkAudioFiles } from './libraryWalk.js';
 
 // ── SSE clients (canale generico /api/events) ─────────────────────────────────
 const sseClients = new Set();
@@ -174,10 +175,7 @@ export async function scanAudioLibrary({ onlyNew = true } = {}) {
     return;
   }
 
-  const entries = fs.readdirSync(folder);
-  const audioFiles = entries.filter(f =>
-    ['.mp3', '.ogg', '.wav'].includes(path.extname(f).toLowerCase())
-  );
+  const audioFiles = walkAudioFiles(folder);
 
   if (audioFiles.length === 0) {
     const msg = 'Nessun file audio trovato nella cartella';

@@ -4,6 +4,7 @@ import path from 'path';
 import fs from 'fs';
 import { getDb } from '../../db/database.js';
 import { pickAlarmTrack } from '../audio/audioLibraryService.js';
+import { walkAudioFiles } from '../audio/libraryWalk.js';
 import { broadcast } from '../../sse.js';
 
 const activeJobs = new Map();
@@ -70,19 +71,15 @@ function getAudioFiles() {
   }
   console.log(`[Audio] ✅ Cartella trovata`);
 
-  let entries;
+  let files;
   try {
-    entries = fs.readdirSync(folder);
+    files = walkAudioFiles(folder);
   } catch (e) {
     console.error(`[Audio] ❌ Errore lettura cartella: ${e.message}`);
     return null;
   }
 
-  const files = entries.filter(f =>
-    ['.mp3', '.ogg', '.wav'].includes(path.extname(f).toLowerCase())
-  );
-
-  console.log(`[Audio] File audio supportati: ${files.length} su ${entries.length} totali`);
+  console.log(`[Audio] File audio supportati trovati: ${files.length}`);
 
   if (files.length === 0) {
     console.error(`[Audio] ❌ Nessun file .mp3/.ogg/.wav trovato in "${folder}"`);

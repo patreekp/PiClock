@@ -149,6 +149,24 @@ const translations = {
     'wifi.error.timeout': 'Connection timed out',
     'wifi.error.connectFailed': 'Could not connect',
 
+    // Audio library file manager
+    'library.title': 'File manager',
+    'library.root': 'Audio folder',
+    'library.newFolder': 'New folder',
+    'library.folderNamePlaceholder': 'Folder name',
+    'library.move': 'Move',
+    'library.moveTitle': 'Move to...',
+    'library.moveHere': 'Move here',
+    'library.noSubfolders': 'No subfolders',
+    'library.delete': 'Delete',
+    'library.deleteConfirm': 'Delete {count} selected item(s)? This cannot be undone.',
+    'library.selectedCount': '{count} selected',
+    'library.empty': 'This folder is empty',
+    'library.dropHint': 'Drop files or folders here',
+    'library.chooseFiles': 'Choose files',
+    'library.chooseFolder': 'Choose folder',
+    'library.uploading': 'Uploading...',
+
     // Folder dialog
     'dialog.audioFolder': 'Audio Folder',
     'dialog.path': 'Path',
@@ -338,6 +356,24 @@ const translations = {
     'wifi.error.wrongPassword': 'Password errata',
     'wifi.error.timeout': 'Connessione scaduta',
     'wifi.error.connectFailed': 'Connessione non riuscita',
+
+    // File manager Libreria Audio
+    'library.title': 'Gestione file',
+    'library.root': 'Cartella audio',
+    'library.newFolder': 'Nuova cartella',
+    'library.folderNamePlaceholder': 'Nome cartella',
+    'library.move': 'Sposta',
+    'library.moveTitle': 'Sposta in...',
+    'library.moveHere': 'Sposta qui',
+    'library.noSubfolders': 'Nessuna sottocartella',
+    'library.delete': 'Elimina',
+    'library.deleteConfirm': 'Eliminare {count} elemento/i selezionato/i? L\'azione non è reversibile.',
+    'library.selectedCount': '{count} selezionati',
+    'library.empty': 'Questa cartella è vuota',
+    'library.dropHint': 'Rilascia qui i file o le cartelle',
+    'library.chooseFiles': 'Scegli file',
+    'library.chooseFolder': 'Scegli cartella',
+    'library.uploading': 'Caricamento in corso...',
 
     // Folder dialog
     'dialog.audioFolder': 'Cartella Audio',

@@ -9,6 +9,7 @@ import { useTranslation } from '../../i18n/useTranslation';
 import { ThemedButton, ThemedSwitch, ThemedToggleGroup, ThemedSlider } from '../../components/ui-themed';
 import type { ToggleOption } from '../../components/ui-themed';
 import CircularTimePicker from '../alarms/CircularTimePicker';
+import { AudioLibraryManager } from '../audio/AudioLibraryManager';
 import { Plus, Trash2 } from 'lucide-react';
 import type { TranslationKey } from '../../i18n/translations';
 
@@ -475,6 +476,9 @@ const RemoteApp = () => {
                 <span className="text-sm">{t('settings.highlightsMode')}</span>
                 <ThemedToggleGroup options={HIGHLIGHT_OPTIONS} value={config.highlightMode} onChange={(val) => updateConfig({ highlightMode: val })} />
               </div>
+
+              <p className="text-xs font-bold uppercase tracking-widest opacity-50 mt-2">{t('library.title')}</p>
+              <AudioLibraryManager />
             </div>
 
             <SettingsDivider />

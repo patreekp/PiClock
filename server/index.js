@@ -16,6 +16,7 @@ import { scanAudioLibrary } from './features/audio/audioLibraryService.js';
 import { getDb } from './db/database.js';
 import { systemRouter } from './features/system/systemRouter.js';
 import { wifiRouter } from './features/wifi/wifiRouter.js';
+import { libraryFsRouter } from './features/audio/libraryFsRouter.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -31,6 +32,7 @@ app.use('/api/todos', todosRouter);
 app.use('/api/alarms', alarmsRouter);
 app.use('/api/config', configRouter);
 app.use('/api/audio', audioRouter);
+app.use('/api/audio/library', libraryFsRouter);
 app.use('/api/pomodoro', pomodoroRouter);
 app.use('/api/remote', remoteRouter);
 app.use('/api/system', systemRouter);

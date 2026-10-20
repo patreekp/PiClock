@@ -313,7 +313,7 @@ piclock/
 │       ├── weather/weatherRouter.js + weatherService.js
 │       ├── todos/todoRouter.js
 │       ├── alarms/alarmRouter.js + alarmService.js
-│       ├── audio/audioRouter.js + audioLibraryService.js
+│       ├── audio/audioRouter.js + audioLibraryService.js + libraryFsRouter.js + libraryFsService.js + libraryWalk.js
 │       ├── pomodoro/pomodoroRouter.js + pomodoroService.js
 │       ├── remote/remoteRouter.js + remoteService.js
 │       ├── config/configRouter.js
@@ -326,7 +326,8 @@ piclock/
 │   ├── store/
 │   │   ├── useAppStore.ts               # Global Zustand store (config, theme, language, page slug, remote nav)
 │   │   ├── usePomodoroStore.ts          # Pomodoro timer state, SSE connection, remote actions
-│   │   └── useWifiStore.ts              # WiFi status/scan/connect state, SSE connection
+│   │   ├── useWifiStore.ts              # WiFi status/scan/connect state, SSE connection
+│   │   └── useAudioLibraryStore.ts      # Audio library browser/selection/move/delete/upload state
 │   ├── components/
 │   │   ├── PageCarousel.tsx             # Swipe navigation + auto theme + remote-navigate listener
 │   │   └── ui-themed.tsx               # ThemedButton, ThemedSwitch, ThemedToggleGroup
@@ -339,6 +340,7 @@ piclock/
 │       ├── todos/TodosPage.tsx
 │       ├── alarms/AlarmsPage.tsx + AlarmModal.tsx
 │       ├── wifi/VirtualKeyboard.tsx     # Themed on-screen keyboard, used for WiFi password entry
+│       ├── audio/AudioLibraryManager.tsx # Folder browser, multi-select move/delete, upload — shared with /remote
 │       ├── remote/RemoteApp.tsx         # Companion control page, served at /remote
 │       └── settings/SettingsPage.tsx
 ├── piclockdb.sqlite                   # Auto-generated on first run
@@ -393,6 +395,18 @@ piclock/
 | `POST` | `/api/audio/scan` | Start a scan (`{ onlyNew: true/false }`) |
 | `POST` | `/api/audio/scan/stop` | Cancel an in-progress scan |
 | `GET` | `/api/audio/events` | SSE stream — scan progress and errors |
+
+### Audio library file manager
+
+Browse/organize the files inside the configured audio folder (and subfolders) directly from the app — no SSH/SCP needed. Available both on the main Settings page and from `/remote`.
+
+| Method | Endpoint | Description |
+|---|---|---|
+| `GET` | `/api/audio/library/list?path=` | List a folder's contents (relative to the audio folder root) |
+| `POST` | `/api/audio/library/mkdir` | Create a subfolder (`{ path, name }`) |
+| `POST` | `/api/audio/library/move` | Move one or more entries (`{ items: string[], destPath }`) |
+| `POST` | `/api/audio/library/delete` | Delete one or more entries, recursively for folders (`{ items: string[] }`) |
+| `POST` | `/api/audio/library/upload` | Multipart upload (files and/or whole folders) |
  
 ### Pomodoro
  
@@ -447,6 +461,8 @@ Timer state lives on the backend (in memory, not persisted), so it can be contro
 **WiFi management** — `server/features/wifi/wifiService.js` picks one of three implementations at module load, based on the host: on Linux with `nmcli` available it drives real NetworkManager commands (via `execFile` with argument arrays, never shell string interpolation, since SSID/password are user input); on Linux without `nmcli` it reports `supported: false` with a reason instead of masking a broken install; on any non-Linux platform (e.g. developing on Windows) it transparently falls back to an in-memory mock implementation, so the whole panel — scan, connect, wrong-password error, forget — is testable without a real Pi. The "Autoreconnect" toggle maps to NetworkManager's per-connection `connection.autoconnect` property, applied to every saved WiFi profile, and the desired state is persisted as the `wifiAutoReconnect` config flag (same `config` table as every other setting). If `nmcli` commands fail with a polkit/"not authorized" error when PiClock runs as a systemd service (no active logical session), either run `nmcli` as the same user that owns an active session, or add a polkit rule granting `org.freedesktop.NetworkManager.network-control` / `...settings.modify.own` to that user.
 
 **Virtual keyboard** — `src/features/wifi/VirtualKeyboard.tsx` is a themed on-screen keyboard (letters + a dedicated numbers/symbols page, Shift, backspace, space, enter) used for entering WiFi passwords on the touchscreen, which has no physical keyboard. No accents, no emoji, no autocomplete — it follows the same `var(--color-fg)`/`var(--color-bg)` token convention and press-feedback style as the rest of the app. The password field itself is `readOnly`, so text only ever comes from this component.
+
+**Audio library file manager** — `server/features/audio/libraryFsService.js` sandboxes every operation inside the configured audio folder: every relative path from the client is resolved with `path.normalize(path.join(root, relativePath))` and then checked to still start with `root` before touching the filesystem, rejecting any path-traversal attempt. This matters because the app has no authentication and is reachable by anyone on the LAN (including via `/remote`). `server/features/audio/libraryWalk.js` is a small recursive directory walker shared by the file manager's folder listing, the highlights scan (`audioLibraryService.js`), and the random-track picker used when an alarm rings (`alarmService.js`) — organizing files into subfolders doesn't hide them from either. Uploads use `multer`'s disk storage; when a whole folder is dropped or picked, each file's relative subpath travels in a separate `relativePaths` JSON field (sent before the `files` fields in the `FormData`, since `req.body` is only populated for fields multer has already parsed) rather than inside the filename itself — busboy/multer deliberately strip any `/`/`\` from `file.originalname` as a security hardening, so the subpath can't be smuggled through the filename. `AudioLibraryManager.tsx` is one shared component mounted both on the main Settings page and inside `/remote`'s Settings mirror, rather than hand-duplicated like the rest of `RemoteApp.tsx` — justified by how much more complex a file manager is than a toggle or a slider.
 
 This consolidation was a deliberate fix, not the original design: browsers cap HTTP/1.1 connections to **6 per origin**, and with each feature originally opening its own long-lived `EventSource`, having both the main display and the `/remote` companion page open at once (see below) could exhaust that limit — causing pages to hang indefinitely in a loading state until one of the open tabs was closed. Server-side, `server/sse.js` exposes a shared `broadcast(event, data)` and `sseHandler`; client-side, `src/lib/sseHub.ts` exposes `onSseEvent(eventName, handler) → unsubscribe` backed by a single singleton `EventSource`. All stores (`usePomodoroStore`, `useWeatherStore`, `useTodoStore`, `useAlarmStore`, `useAppStore`) consume events through this shared hub instead of opening their own connection. Heartbeats every 25 seconds keep the single connection alive through proxies.
  
